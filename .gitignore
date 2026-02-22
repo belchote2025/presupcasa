@@ -1,0 +1,30 @@
+# Logs
+logs/*.log
+*.log
+
+# Entorno y secretos
+.env
+.env.local
+.env.*.local
+
+# Sistema
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backup y temporales
+*.bak
+*.tmp
+backup_*.json
+
+# Subida de archivos (si guardas adjuntos en una carpeta)
+uploads/
+temp/
+tmp/

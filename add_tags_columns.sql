@@ -1,0 +1,4 @@
+-- Etiquetas/categorías para filtrar presupuestos y facturas
+-- Ejecutar manualmente si la migración automática (upgrade_tags_schema) no se ha ejecutado:
+-- ALTER TABLE quotes ADD COLUMN tags VARCHAR(255) NULL;
+-- ALTER TABLE invoices ADD COLUMN tags VARCHAR(255) NULL;

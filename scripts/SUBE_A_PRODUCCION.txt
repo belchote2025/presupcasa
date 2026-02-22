@@ -1,0 +1,34 @@
+# Archivos a subir a producción (PRESUNAVEGATEL – integraciones)
+
+Ejecutar UNA VEZ en el servidor de producción (si aún no lo has hecho):
+- add_integraciones.sql (o add_integraciones_columnas.php) para: sender_name, document_language, payment_link_url, payment_enabled, backup_email, quote_signature.
+- add_document_footer.php para la columna document_footer en company_settings (pie de página editable).
+- add_customers_extra.php para columnas en customers: notes, category, lead_source, birthday.
+- add_multi_company.php para multi-empresa: tabla companies, current_company_id, company_id en customers (y opcionalmente en quotes, invoices, appointments, expenses). Luego borrar los .php de migración por seguridad.
+
+## Archivos a subir (cambios efectivos)
+- api.php
+- app.js
+- index.html
+- style.css
+
+## Archivos de migración (solo para ejecutar 1 vez cada uno)
+- add_document_footer.php
+- add_customers_extra.php
+- add_multi_company.php
+- add_integraciones.sql o add_integraciones_columnas.php  → si no lo ejecutaste antes
+
+## Resumen de funcionalidades
+1. Email: botón «Enviar por email» en el editor; modal con destinatario, asunto y mensaje; adjunto PDF. Config: nombre del remitente.
+2. WhatsApp: texto mejorado al compartir (tipo de documento, ID, mención a descarga por email).
+3. Calendario: botón «.ics» en cada cita para descargar evento e importar en Google Calendar / Outlook.
+4. Pagos: en Config, «Mostrar botón Pagar» y «URL del enlace de pago»; en facturas se muestra el botón «Pagar» que abre esa URL (soporta {id}).
+5. Firma del cliente: al marcar un presupuesto como «Aceptado» desde el historial se abre un modal para firmar en canvas; la firma se guarda y se muestra en la vista previa y en el PDF.
+6. Backup por email: botón «Enviar copia por email» en Configuración; usa el email de backup configurado o se puede indicar destinatario.
+7. Idioma del documento: en Config, selector Español / English; las etiquetas del presupuesto/factura se muestran en el idioma elegido.
+8. QR en el documento: en facturas, si hay URL de pago configurada, se muestra un QR en el pie del documento que enlaza al pago online.
+9. Pie de página editable: en Config, textarea «Pie de página del documento»; el contenido (HTML opcional) se muestra al final del presupuesto/factura en vista previa y PDF.
+10. Sección Leads: menú «Leads» con formulario Vendomia embebido (iframe) y formulario para guardar el contacto también en la agenda de Clientes; si Vendomia envía postMessage al enviar, el lead se añade automáticamente a Clientes.
+11. Clientes y leads: Notas por cliente (textarea); categoría (Particular, Empresa, Recurrente, Otro); origen del lead (Manual, Vendomia, Web, Referido, Otro); cumpleaños/aniversario (fecha); filtro por categoría en la agenda; bloque «Cumpleaños este mes» en Clientes; al guardar desde Leads se marca origen Vendomia.
+12. Log de actividad: en Clientes, botón «Ver» en cada cliente abre modal con datos y log de actividad (quién creó/editó el cliente); endpoint get_audit_log para presupuestos, facturas y clientes.
+13. Multi-empresa: selector de empresa en el menú lateral (cuando hay 2+ empresas); en Config, bloque «Multi-empresa» para añadir otra empresa; get_settings/save_settings usan la empresa activa; clientes filtrados por empresa activa; crear cliente asigna company_id.

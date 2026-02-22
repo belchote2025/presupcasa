@@ -1,0 +1,5 @@
+# Evitar listado del directorio y acceso directo a .log
+<Files "*.log">
+    Require all denied
+</Files>
+Options -Indexes

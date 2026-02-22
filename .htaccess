@@ -1,0 +1,29 @@
+# PRESUNAVEGATEL - Evitar 508 Loop Detected en Hostinger
+# Asegura que api.php y los archivos PHP se ejecuten sin ser redirigidos.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Si tu app está en un subdirectorio, descomenta y ajusta (ej. /presup/):
+    # RewriteBase /presup/
+
+    # NUNCA reescribir api.php ni otros .php (evita loop)
+    RewriteCond %{REQUEST_URI} ^/.*api\.php [OR]
+    RewriteCond %{REQUEST_URI} \.php$
+    RewriteRule ^ - [L]
+
+    # No reescribir archivos ni directorios existentes
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+</IfModule>
+
+# Evitar que el servidor devuelva 508 por tiempo (opcional)
+<IfModule mod_reqtimeout.c>
+    RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+</IfModule>
+
+# Tipos para API
+<FilesMatch "api\.php">
+    Header set Content-Type "application/json; charset=utf-8"
+</FilesMatch>

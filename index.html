@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRESUNAVEGATEL - Generador de Presupuestos Premium</title>
+    <meta name="description" content="Crea, edita y gestiona presupuestos profesionales de forma rápida y sencilla.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo.png">
+    <meta name="theme-color" content="#d21f2b">
+    <!-- Lucide Icons for modern UI -->
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <!-- PDF Libraries - Cargar solo cuando se necesiten -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+</head>
+
+<body class="auth-mode">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-container">
+        <div class="login-card">
+            <button type="button" id="login-theme-toggle" class="login-theme-toggle" title="Cambiar tema (claro/oscuro)" aria-label="Cambiar tema">
+                <i id="login-theme-icon" data-lucide="moon"></i>
+            </button>
+            <img src="logo.png" alt="Logo" class="login-logo">
+            <h2>Acceso a PRESUNAVEGATEL</h2>
+            <div class="input-group">
+                <label>Usuario</label>
+                <input type="text" id="login-user" placeholder="Tu usuario">
+            </div>
+            <div class="input-group">
+                <label>Contraseña</label>
+                <input type="password" id="login-pass" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-login">Entrar</button>
+            <p class="login-links" style="margin-top: 1rem; text-align: center;">
+                <button type="button" id="link-forgot-password" class="link-button" style="background:none;border:none;color: var(--primary); font-size: 0.9rem; cursor: pointer; text-decoration: underline; padding: 0;">¿Olvidaste tu contraseña?</button>
+            </p>
+            <p id="login-error" class="error-text hidden"
+                style="color: var(--danger); margin-top: 1rem; text-align: center;">Usuario o contraseña incorrectos</p>
+
+            <!-- Flujo recuperación de contraseña -->
+            <div id="password-reset-panel" class="hidden" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <h4 style="margin-bottom: 0.75rem; font-size: 1rem;">Restablecer contraseña</h4>
+                <div id="reset-request-form">
+                    <div class="input-group">
+                        <label>Usuario</label>
+                        <input type="text" id="reset-username" placeholder="Tu usuario">
+                    </div>
+                    <button class="btn btn-secondary btn-full" id="btn-request-reset">Enviar enlace</button>
+                    <p id="reset-request-msg" class="hidden" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);"></p>
+                </div>
+                <div id="reset-form" class="hidden">
+                    <div class="input-group">
+                        <label>Nueva contraseña (mín. 4 caracteres)</label>
+                        <input type="password" id="reset-new-password" placeholder="••••••••">
+                    </div>
+                    <button class="btn btn-primary btn-full" id="btn-do-reset">Cambiar contraseña</button>
+                    <p id="reset-msg" class="hidden" style="margin-top: 0.5rem; font-size: 0.85rem;"></p>
+                </div>
+                <p style="margin-top: 0.75rem;"><button type="button" id="link-back-login" class="link-button" style="background:none;border:none;color: var(--text-muted); font-size: 0.85rem; cursor: pointer; text-decoration: underline; padding: 0;">Volver al inicio de sesión</button></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista pública: el cliente abre el enlace, ve el presupuesto y firma para aceptarlo -->
+    <div id="accept-quote-view" class="hidden" style="min-height: 100vh; background: var(--bg); padding: 2rem 1rem; box-sizing: border-box;">
+        <div class="card" style="max-width: 560px; margin: 0 auto;">
+            <h2 style="margin: 0 0 1rem; font-size: 1.25rem;"><i data-lucide="file-signature"></i> Aceptar presupuesto</h2>
+            <p id="accept-quote-error" class="error-text hidden" style="margin-bottom: 1rem;"></p>
+            <div id="accept-quote-summary" style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-sub); border-radius: 8px; font-size: 0.9rem;"></div>
+            <div id="accept-quote-success" class="hidden" style="padding: 1rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; color: #10b981;">
+                <strong>Presupuesto aceptado.</strong> Gracias por su confianza.
+            </div>
+            <div id="accept-quote-form" class="hidden">
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Firme a continuación o indique su nombre para aceptar el presupuesto.</p>
+                <div class="input-group" style="margin-bottom: 0.75rem;">
+                    <label>Nombre (quien acepta)</label>
+                    <input type="text" id="accept-quote-name" placeholder="Ej: Juan Pérez" maxlength="200">
+                </div>
+                <div class="input-group" style="margin-bottom: 0.75rem;">
+                    <label>Firma (opcional si escribe el nombre)</label>
+                    <canvas id="accept-quote-canvas" width="400" height="140" style="border: 1px solid var(--border); border-radius: 8px; display: block; touch-action: none; background: #fff; max-width: 100%;"></canvas>
+                    <button type="button" class="btn btn-secondary btn-sm" id="accept-quote-clear" style="margin-top: 0.35rem;">Borrar firma</button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="button" class="btn btn-primary" id="accept-quote-submit"><i data-lucide="check" style="width:16px;height:16px;"></i> Aceptar presupuesto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container hidden" id="app-container">
+        <!-- Modal Avisos del día (citas, pendientes, mensajes) -->
+        <div id="dashboard-alerts-modal" class="modal-overlay hidden" role="dialog" aria-labelledby="alerts-modal-title">
+            <div class="modal-card" style="max-width: 520px;">
+                <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                    <h3 id="alerts-modal-title" style="margin: 0;"><i data-lucide="bell" style="width: 1.25rem; height: 1.25rem; vertical-align: middle;"></i> Avisos</h3>
+                    <button type="button" class="btn btn-secondary btn-sm" id="alerts-modal-close" aria-label="Cerrar">Cerrar</button>
+                </div>
+                <div id="dashboard-alerts-body" class="modal-body"></div>
+            </div>
+        </div>
+        <div class="sidebar-overlay"></div>
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="logo.png" alt="PRESUNAVEGATEL Logo" class="logo-image">
+            </div>
+            <div id="company-switcher-wrap" class="company-switcher-wrap hidden" style="margin-bottom: 0.75rem; padding: 0 0.75rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Empresa</label>
+                <select id="company-switcher" class="status-select" style="width: 100%; font-size: 0.85rem; padding: 0.4rem;"></select>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-group">
+                    <span class="nav-group-label">Principal</span>
+                    <button class="nav-item active" id="nav-dashboard">
+                        <i data-lucide="layout-dashboard" class="nav-icon"></i> Inicio
+                    </button>
+                    <button class="nav-item" id="nav-editor">
+                        <i data-lucide="edit-3" class="nav-icon"></i> Editor
+                    </button>
+                    <button class="nav-item" id="nav-history">
+                        <i data-lucide="history" class="nav-icon"></i> Historial
+                    </button>
+                    <button class="nav-item" id="nav-invoices">
+                        <i data-lucide="file-text" class="nav-icon"></i> Facturas
+                    </button>
+                    <button class="nav-item" id="nav-projects">
+                        <i data-lucide="folder-kanban" class="nav-icon"></i> Proyectos
+                    </button>
+                    <button class="nav-item" id="nav-activities">
+                        <i data-lucide="list-todo" class="nav-icon"></i> Actividades / Tareas
+                    </button>
+                    <button class="nav-item" id="nav-contracts">
+                        <i data-lucide="file-signature" class="nav-icon"></i> Contratos
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <span class="nav-group-label">Datos y agenda</span>
+                    <button class="nav-item" id="nav-appointments">
+                        <i data-lucide="calendar" class="nav-icon"></i> Citas
+                    </button>
+                    <button class="nav-item" id="nav-calendar">
+                        <i data-lucide="calendar-days" class="nav-icon"></i> Calendario
+                    </button>
+                    <button class="nav-item" id="nav-customers">
+                        <i data-lucide="users" class="nav-icon"></i> Clientes
+                    </button>
+                    <button class="nav-item" id="nav-catalog">
+                        <i data-lucide="book-open" class="nav-icon"></i> Catálogo
+                    </button>
+                    <button class="nav-item" id="nav-expenses">
+                        <i data-lucide="receipt" class="nav-icon"></i> Gastos
+                    </button>
+                    <button class="nav-item" id="nav-leads">
+                        <i data-lucide="user-plus" class="nav-icon"></i> Leads
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <span class="nav-group-label">Sistema</span>
+                    <button class="nav-item" id="nav-settings">
+                        <i data-lucide="settings" class="nav-icon"></i> Configuración
+                    </button>
+                    <button class="nav-item admin-only hidden" id="nav-admin">
+                        <i data-lucide="shield-check" class="nav-icon"></i> Usuarios y mensajes (Admin)
+                    </button>
+                </div>
+                <div class="nav-group nav-group-bottom">
+                    <button class="nav-item nav-item-logout" id="btn-logout">
+                        <i data-lucide="log-out" class="nav-icon"></i> Cerrar sesión
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-container">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="global-search" placeholder="Buscar presupuestos...">
+                </div>
+                <div class="user-profile">
+                    <button class="btn btn-secondary btn-sm" id="btn-toggle-preview"
+                        title="Ver documento a pantalla completa">
+                        <i data-lucide="maximize-2"></i>
+                    </button>
+                    <div class="theme-toggle" id="theme-toggle">
+                        <i id="theme-icon" data-lucide="moon"></i>
+                    </div>
+                    <div id="user-avatar" class="avatar">JS</div>
+                </div>
+            </header>
+
+            <div class="editor-layout">
+                <section class="form-section view-section" id="section-dashboard">
+                    <div class="grid-2" id="dashboard-stats-section">
+                        <div class="card stat-card">
+                            <i data-lucide="trending-up" class="stat-icon income"></i>
+                            <div class="stat-info">
+                                <h3>Ingresos Cobrados</h3>
+                                <p id="stat-income" class="stat-value">0,00 €</p>
+                            </div>
+                        </div>
+                        <div class="card stat-card">
+                            <i data-lucide="clock" class="stat-icon pending"></i>
+                            <div class="stat-info">
+                                <h3>Pendiente de Pago</h3>
+                                <p id="stat-pending" class="stat-value">0,00 €</p>
+                            </div>
+                        </div>
+                        <div class="card stat-card">
+                            <i data-lucide="trending-down" class="stat-icon expense"></i>
+                            <div class="stat-info">
+                                <h3>Gastos Totales</h3>
+                                <p id="stat-expenses" class="stat-value">0,00 €</p>
+                            </div>
+                        </div>
+                        <div class="card stat-card">
+                            <i data-lucide="wallet" class="stat-icon balance"></i>
+                            <div class="stat-info">
+                                <h3>Balance Neto</h3>
+                                <p id="stat-balance" class="stat-value">0,00 €</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <h3><i data-lucide="zap"></i> Acciones rápidas y resumen</h3>
+                        <div class="grid-2" style="margin-top: 1rem; gap: 1.5rem;">
+                            <button class="btn btn-primary" id="btn-quick-new-quote">
+                                <i data-lucide="file-plus"></i> Nuevo presupuesto
+                            </button>
+                            <button class="btn btn-secondary" id="btn-quick-new-invoice">
+                                <i data-lucide="file-text"></i> Ver facturas
+                            </button>
+                            <button class="btn btn-secondary" id="btn-quick-new-expense">
+                                <i data-lucide="receipt"></i> Nuevo gasto
+                            </button>
+                            <button class="btn btn-secondary" id="btn-quick-new-appt">
+                                <i data-lucide="calendar-plus"></i> Nueva cita
+                            </button>
+                        </div>
+                        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem;">
+                            Desde aquí puedes ver de un vistazo cómo va tu negocio hoy:
+                        </p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">
+                            <div>
+                                <strong>Ingresos cobrados</strong>
+                                <p style="margin-top:0.15rem;">Presupuestos convertidos en facturas pagadas.</p>
+                            </div>
+                            <div>
+                                <strong>Pendiente de pago</strong>
+                                <p style="margin-top:0.15rem;">Facturas emitidas aún sin cobrar.</p>
+                            </div>
+                            <div>
+                                <strong>Gastos totales</strong>
+                                <p style="margin-top:0.15rem;">Todos los gastos registrados en tu actividad.</p>
+                            </div>
+                            <div>
+                                <strong>Balance neto</strong>
+                                <p style="margin-top:0.15rem;">Ingresos menos gastos (verde/rojo).</p>
+                            </div>
+                            <div>
+                                <strong>Total presupuestos</strong>
+                                <p style="margin-top:0.15rem;">
+                                    <span id="stat-quotes-count">0</span> documentos guardados.
+                                </p>
+                            </div>
+                            <div>
+                                <strong>Total facturas</strong>
+                                <p style="margin-top:0.15rem;">
+                                    <span id="stat-invoices-count">0</span> emitidas.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;" id="dashboard-month-summary-card">
+                        <h3><i data-lucide="calendar"></i> Este mes</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Presupuestos y facturas del mes en curso; importe cobrado.</p>
+                        <div id="dashboard-month-summary" style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.75rem; font-size: 1rem;">
+                            <span><strong id="month-stat-quotes">0</strong> presupuestos</span>
+                            <span><strong id="month-stat-invoices">0</strong> facturas</span>
+                            <span><strong id="month-stat-invoiced" style="color: var(--accent);">0,00 €</strong> cobrado</span>
+                        </div>
+                        <div id="dashboard-month-summary-prev" style="margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 0.75rem; display: none;">
+                            Mes pasado: <strong id="month-stat-quotes-prev">0</strong> presupuestos, <strong id="month-stat-invoices-prev">0</strong> facturas, <strong id="month-stat-invoiced-prev" style="color: var(--text-muted);">0,00 €</strong> cobrado
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;" id="dashboard-my-tasks-card">
+                        <h3><i data-lucide="user-check"></i> Mis tareas asignadas</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Tareas que tienes asignadas en proyectos. Haz clic para ir al proyecto.</p>
+                        <div id="dashboard-my-tasks-list" class="history-list" style="margin-top: 0.75rem; max-height: 180px; overflow-y: auto;">
+                            <!-- Se rellena por JS -->
+                        </div>
+                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-dashboard-go-projects">
+                                <i data-lucide="folder-kanban" style="width: 14px; height: 14px;"></i> Ir a Proyectos
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm" id="btn-dashboard-go-activities">
+                                <i data-lucide="list-todo" style="width: 14px; height: 14px;"></i> Ver actividades y tareas
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card admin-only hidden" style="margin-top: 1.5rem;" id="dashboard-deletion-requests-card">
+                        <h3><i data-lucide="trash-2"></i> Solicitudes de eliminación</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Usuarios han solicitado eliminar presupuestos o facturas. Aprueba o rechaza.</p>
+                        <div id="dashboard-deletion-requests-list" class="history-list" style="margin-top: 0.75rem; max-height: 200px; overflow-y: auto;">
+                            <!-- Se rellena por JS -->
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;" id="dashboard-overdue-card">
+                        <h3><i data-lucide="alert-circle"></i> Facturas pendientes de cobro (+30 días)</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Facturas no cobradas con más de 30 días de antigüedad.</p>
+                        <div id="dashboard-overdue-list" class="history-list" style="margin-top: 0.75rem; max-height: 160px; overflow-y: auto;"></div>
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;" id="btn-dashboard-go-invoices-overdue">Ir a Facturas</button>
+                    </div>
+                    <div class="card" style="margin-top: 1.5rem;" id="dashboard-chart-card">
+                        <h3><i data-lucide="trending-up"></i> Ingresos por mes</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Últimos 6 meses (cobrados).</p>
+                        <div id="dashboard-chart-container" style="min-height: 180px; margin-top: 0.75rem;"></div>
+                    </div>
+                    <div class="card" style="margin-top: 1.5rem;" id="dashboard-recurring-card">
+                        <h3><i data-lucide="repeat"></i> Próximas facturas recurrentes</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Facturas recurrentes con próxima emisión en los próximos 30 días.</p>
+                        <div id="dashboard-recurring-list" class="history-list" style="margin-top: 0.75rem; max-height: 160px; overflow-y: auto;">
+                            <!-- Se rellena por JS -->
+                        </div>
+                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-accent btn-sm" id="btn-process-recurring-invoices" title="Generar facturas recurrentes pendientes">
+                                <i data-lucide="repeat" style="width: 14px; height: 14px;"></i> Procesar recurrentes
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-dashboard-go-invoices">Ir a Facturas</button>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <h3><i data-lucide="history"></i> Actividad reciente</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">
+                            Últimos presupuestos creados o modificados.
+                        </p>
+                        <div id="dashboard-recent-list" class="history-list" style="margin-top: 0.75rem; max-height: 220px; overflow-y: auto;">
+                            <!-- Últimos documentos se cargarán aquí -->
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <h3><i data-lucide="users"></i> Top clientes recientes</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">
+                            Tus clientes más importantes según el importe facturado recientemente.
+                        </p>
+                        <div id="dashboard-top-clients" class="history-list" style="margin-top: 0.75rem;">
+                            <!-- Top clientes se cargarán aquí -->
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <h3><i data-lucide="box"></i> Top servicios recientes</h3>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">
+                            Servicios o conceptos que más has presupuestado/facturado en los últimos meses.
+                        </p>
+                        <div id="dashboard-top-services" class="history-list" style="margin-top: 0.75rem;">
+                            <!-- Top servicios se cargarán aquí -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-editor">
+                    <div class="card editor-actions-bar">
+                        <h3 style="margin-bottom: 0.75rem;"><i data-lucide="zap"></i> Acciones del documento</h3>
+                        <div class="editor-actions-buttons">
+                            <button class="btn btn-accent" id="btn-save">
+                                <i data-lucide="save"></i> Guardar
+                            </button>
+                            <button class="btn btn-secondary" id="btn-duplicate">
+                                <i data-lucide="copy"></i> Duplicar
+                            </button>
+                            <button class="btn btn-secondary" id="btn-export-einvoice" title="Descargar JSON con datos para Verifactu / factura electrónica">
+                                <i data-lucide="file-output"></i> Verifactu / Factura electrónica
+                            </button>
+                            <button class="btn btn-primary" id="btn-download">
+                                <i data-lucide="download"></i> Descargar PDF
+                            </button>
+                            <button class="btn btn-secondary" id="btn-print">
+                                <i data-lucide="printer"></i> Imprimir
+                            </button>
+                            <button class="btn btn-secondary" id="btn-whatsapp">
+                                <i data-lucide="message-circle"></i> WhatsApp
+                            </button>
+                            <button class="btn btn-secondary" id="btn-send-email">
+                                <i data-lucide="mail"></i> Enviar por email
+                            </button>
+                            <button class="btn btn-secondary hidden" id="btn-copy-accept-link" title="Copiar enlace para que el cliente firme y acepte el presupuesto">
+                                <i data-lucide="link"></i> Enlace para firmar
+                            </button>
+                            <button class="btn btn-accent hidden" id="btn-pay-invoice" title="Abrir enlace de pago">
+                                <i data-lucide="credit-card"></i> Pagar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="info"></i> Información General</h3>
+                            <div class="status-badge-container" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                                <div class="input-group" style="margin-bottom:0;min-width:180px;">
+                                    <label style="font-size:0.75rem;">Plantilla</label>
+                                    <select id="editor-document-template" class="status-select" style="width:100%;" title="Aplicar líneas y notas por defecto">
+                                        <option value="">Ninguna</option>
+                                    </select>
+                                </div>
+                                <select id="quote-status" class="status-select">
+                                    <option value="draft">Borrador</option>
+                                    <option value="sent">Enviado</option>
+                                    <option value="accepted">Aceptado</option>
+                                    <option value="rejected">Rechazado</option>
+                                </select>
+                                <div class="input-group" style="margin-bottom:0;min-width:160px;">
+                                    <label style="font-size:0.75rem;">Etiquetas</label>
+                                    <input type="text" id="editor-document-tags" placeholder="Ej: mantenimiento, instalación" style="font-size:0.85rem;" title="Etiquetas separadas por comas para filtrar después">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="user"></i> Datos del Cliente</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-save-as-customer"
+                                title="Guardar en Agenda">
+                                <i data-lucide="user-plus"></i> Agenda
+                            </button>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Cliente / Empresa</label>
+                                <input type="text" id="client-name" placeholder="Nombre completo">
+                            </div>
+                            <div class="input-group">
+                                <label>NIF / CIF</label>
+                                <input type="text" id="client-id" placeholder="Documento ID">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Dirección</label>
+                            <input type="text" id="client-address" placeholder="Calle, Ciudad, CP">
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Email</label>
+                                <input type="email" id="client-email" placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="input-group">
+                                <label>Teléfono (WhatsApp)</label>
+                                <input type="tel" id="client-phone" placeholder="Ej: 600000000">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Proyecto</label>
+                            <select id="editor-project-id" class="status-select" style="width: 100%;" title="Vincular a un proyecto">
+                                <option value="">— Sin proyecto —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3><i data-lucide="box"></i> Artículos</h3>
+                        <div class="items-header">
+                            <span>Descripción</span>
+                            <span>Cant.</span>
+                            <span>Precio</span>
+                            <span>IVA %</span>
+                            <span></span>
+                        </div>
+                        <div id="items-container" class="items-list">
+                            <!-- Items will be injected here -->
+                        </div>
+                        <input type="file" id="item-image-upload" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
+                        <button class="btn btn-secondary btn-dashed" id="add-item">
+                            <i data-lucide="plus"></i> Añadir Artículo
+                        </button>
+                    </div>
+
+                    <div class="card">
+                        <h3><i data-lucide="align-left"></i> Notas / Observaciones</h3>
+                        <div class="input-group">
+                            <textarea id="quote-notes" rows="4"
+                                placeholder="Ej: Condiciones de pago, plazo de entrega, validez..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="card hidden" id="recurring-invoice-card">
+                        <h3><i data-lucide="repeat"></i> Factura recurrente</h3>
+                        <div class="input-group">
+                            <label style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="recurring-invoice-enabled">
+                                Marcar esta factura como recurrente
+                            </label>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Frecuencia</label>
+                                <select id="recurring-invoice-frequency" class="status-select" style="width: 100%;">
+                                    <option value="monthly">Mensual</option>
+                                    <option value="quarterly">Trimestral</option>
+                                    <option value="yearly">Anual</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Próxima fecha de emisión</label>
+                                <input type="date" id="recurring-invoice-next-date">
+                            </div>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                            Esta información se guarda junto a la factura para ayudarte a gestionar cobros periódicos.
+                        </p>
+                    </div>
+
+                    <div class="card" id="audit-log-card" style="display: none;">
+                        <h3><i data-lucide="clock"></i> Historial de Cambios</h3>
+                        <div id="audit-log-list" class="history-list" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Historial de cambios se cargará aquí -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-history">
+                    <div class="card">
+                        <div class="header-with-action history-header">
+                            <h3><i data-lucide="history"></i> Historial de Presupuestos</h3>
+                            <div class="history-header-actions">
+                                <select id="history-client-filter" class="status-select" title="Filtrar por cliente" style="min-width: 160px;">
+                                    <option value="">Todos los clientes</option>
+                                </select>
+                                <select id="history-status-filter" class="status-select">
+                                    <option value="all">Todos</option>
+                                    <option value="draft">Borrador</option>
+                                    <option value="sent">Enviado</option>
+                                    <option value="accepted">Aceptado</option>
+                                    <option value="rejected">Rechazado</option>
+                                </select>
+                                <input type="text" id="history-tag-filter" class="status-select" placeholder="Etiqueta" title="Filtrar por etiqueta" style="min-width:100px;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-export-history-csv" title="Exportar a CSV">
+                                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> Exportar CSV
+                                </button>
+                            </div>
+                            <div class="history-header-dates grid-2" style="margin-top: 0.75rem; gap: 0.5rem;">
+                                <div class="input-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">Desde</label>
+                                    <input type="date" id="history-date-from" style="font-size: 0.85rem;">
+                                </div>
+                                <div class="input-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">Hasta</label>
+                                    <input type="date" id="history-date-to" style="font-size: 0.85rem;">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="history-list" class="history-list">
+                            <!-- Saved quotes will be listed here -->
+                        </div>
+                        <div id="history-pagination" class="pagination-bar hidden" style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;"></div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-invoices">
+                    <div class="card">
+                        <div class="header-with-action invoices-header">
+                            <h3><i data-lucide="file-text"></i> Facturas Generadas</h3>
+                            <div class="invoices-header-actions">
+                                <select id="invoices-client-filter" class="status-select" title="Filtrar por cliente" style="min-width: 160px;">
+                                    <option value="">Todos los clientes</option>
+                                </select>
+                                <select id="invoices-status-filter" class="status-select">
+                                    <option value="all">Todas</option>
+                                    <option value="pending">Pendientes</option>
+                                    <option value="paid">Pagadas</option>
+                                    <option value="cancelled">Anuladas</option>
+                                    <option value="recurring">Recurrentes</option>
+                                </select>
+                                <input type="text" id="invoices-tag-filter" class="status-select" placeholder="Etiqueta" title="Filtrar por etiqueta" style="min-width:100px;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-export-invoices-csv" title="Exportar a CSV">
+                                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> Exportar CSV
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-export-invoices-accounting" title="Exportar para contabilidad (CSV con Base, IVA, Total)">
+                                    <i data-lucide="calculator" style="width: 14px; height: 14px;"></i> Para contabilidad
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-new-invoice" title="Crear nueva factura">
+                                    <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i> Nueva factura
+                                </button>
+                            </div>
+                            <div class="invoices-header-dates grid-2" style="margin-top: 0.75rem; gap: 0.5rem;">
+                                <div class="input-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">Desde</label>
+                                    <input type="date" id="invoices-date-from" style="font-size: 0.85rem;">
+                                </div>
+                                <div class="input-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">Hasta</label>
+                                    <input type="date" id="invoices-date-to" style="font-size: 0.85rem;">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="invoices-list" class="history-list">
+                            <!-- Invoices will be listed here -->
+                        </div>
+                        <div id="invoices-pagination" class="pagination-bar hidden" style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;"></div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-projects">
+                    <div class="card" id="projects-my-tasks-card" style="margin-bottom: 1rem;">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="user-check"></i> Mis tareas asignadas</h3>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <select id="projects-my-tasks-filter" class="status-select" style="width: auto; font-size: 0.85rem;">
+                                    <option value="pending">Solo pendientes</option>
+                                    <option value="all">Todas</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-projects-go-activities" title="Ver actividades y tareas"><i data-lucide="list-todo" style="width:14px;height:14px;"></i> Actividades / Tareas</button>
+                            </div>
+                        </div>
+                        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Tareas que tienes asignadas en los proyectos. En <strong>Actividades / Tareas</strong> puedes marcar completadas y ver más detalle.</p>
+                        <div id="projects-my-tasks-list" class="history-list" style="margin-top: 0.75rem; max-height: 220px; overflow-y: auto;">
+                            <!-- Se rellena por JS -->
+                        </div>
+                    </div>
+                    <div class="card" id="projects-list-card">
+                        <div class="header-with-action projects-header">
+                            <h3><i data-lucide="folder-kanban"></i> Proyectos</h3>
+                            <div class="projects-header-actions">
+                                <select id="projects-status-filter" class="status-select" title="Filtrar por estado">
+                                    <option value="">Todos los estados</option>
+                                    <option value="planning">Planificación</option>
+                                    <option value="in_progress">En curso</option>
+                                    <option value="on_hold">Pausado</option>
+                                    <option value="completed">Completado</option>
+                                    <option value="cancelled">Cancelado</option>
+                                </select>
+                                <input type="text" id="projects-search" placeholder="Buscar por nombre, cliente o descripción" class="status-select" style="min-width: 180px;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-export-projects-csv" title="Exportar proyectos a CSV">
+                                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> CSV
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-new-project">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Nuevo proyecto
+                                </button>
+                            </div>
+                        </div>
+                        <div id="projects-list" class="history-list projects-list">
+                            <!-- Lista de proyectos -->
+                        </div>
+                    </div>
+                    <div class="card hidden" id="project-form-card">
+                        <div class="header-with-action">
+                            <h3 id="project-form-title"><i data-lucide="folder-plus"></i> Nuevo proyecto</h3>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-project-back-to-list">
+                                <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Volver al listado
+                            </button>
+                        </div>
+                        <input type="hidden" id="project-id">
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Nombre del proyecto</label>
+                                <input type="text" id="project-name" placeholder="Ej: Rediseño web">
+                            </div>
+                            <div class="input-group">
+                                <label>Cliente</label>
+                                <select id="project-client-id" class="status-select" style="width: 100%;">
+                                    <option value="">— Sin asignar —</option>
+                                </select>
+                                <input type="text" id="project-client-name" placeholder="O escribir nombre libre" style="margin-top: 0.35rem;">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Descripción</label>
+                            <textarea id="project-description" rows="3" placeholder="Objetivos, alcance..."></textarea>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Estado</label>
+                                <select id="project-status" class="status-select" style="width: 100%;">
+                                    <option value="planning">Planificación</option>
+                                    <option value="in_progress">En curso</option>
+                                    <option value="on_hold">Pausado</option>
+                                    <option value="completed">Completado</option>
+                                    <option value="cancelled">Cancelado</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Presupuesto (€)</label>
+                                <input type="number" id="project-budget" step="0.01" min="0" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Fecha inicio</label>
+                                <input type="date" id="project-start-date">
+                            </div>
+                            <div class="input-group">
+                                <label>Fecha fin</label>
+                                <input type="date" id="project-end-date">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-accent" id="btn-save-project">
+                                <i data-lucide="save" style="width: 16px; height: 16px;"></i> Guardar proyecto
+                            </button>
+                            <button type="button" class="btn btn-remove" id="btn-delete-project" title="Eliminar proyecto y sus tareas">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Eliminar proyecto
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card hidden" id="project-detail-card">
+                        <div class="header-with-action">
+                            <h3 id="project-detail-name"><i data-lucide="folder-open"></i> Proyecto</h3>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-project-duplicate" title="Duplicar proyecto (con tareas)">
+                                    <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Duplicar
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-project-edit">
+                                    <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Editar
+                                </button>
+                                <button type="button" class="btn btn-remove btn-sm" id="btn-project-detail-delete" title="Eliminar proyecto">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Eliminar
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-project-detail-back">
+                                    <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Volver
+                                </button>
+                            </div>
+                        </div>
+                        <div id="project-detail-meta" style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);"></div>
+                        <div id="project-detail-description" style="margin-bottom: 1rem;"></div>
+                        <h4 style="margin: 1rem 0 0.5rem;"><i data-lucide="check-square"></i> Tareas</h4>
+                        <div class="input-group" style="margin-bottom: 0.75rem;">
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                <input type="text" id="project-task-title" placeholder="Nueva tarea..." style="flex: 1; min-width: 160px;">
+                                <input type="date" id="project-task-due" style="width: auto;">
+                                <select id="project-task-assignee" class="status-select" style="width: auto; min-width: 140px;" title="Asignar a usuario">
+                                    <option value="">— Sin asignar —</option>
+                                </select>
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-add-project-task">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Añadir
+                                </button>
+                            </div>
+                        </div>
+                        <div id="project-tasks-list" class="history-list" style="max-height: 320px; overflow-y: auto;">
+                            <!-- Tareas del proyecto -->
+                        </div>
+                        <div id="project-detail-linked-docs" style="margin-top: 1.5rem;"></div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-activities">
+                    <div class="card activities-header-card">
+                        <div class="activities-header">
+                            <div>
+                                <h2 style="margin:0 0 0.25rem 0; font-size: 1.35rem;"><i data-lucide="list-todo"></i> Actividades y tareas</h2>
+                                <p style="margin:0; color: var(--text-muted); font-size: 0.9rem;">Mis tareas asignadas. Márcalas como hechas, busca, ordena o asigna nuevas a otros desde aquí.</p>
+                            </div>
+                        </div>
+                        <div class="activities-stats" id="activities-stats">
+                            <div class="activity-stat"><span class="activity-stat-value" id="activities-count-pending">0</span><span class="activity-stat-label">Pendientes</span></div>
+                            <div class="activity-stat activity-stat-clickable" title="Filtrar por vencidas"><span class="activity-stat-value" id="activities-count-overdue">0</span><span class="activity-stat-label">Vencidas</span></div>
+                            <div class="activity-stat activity-stat-clickable" title="Filtrar por esta semana"><span class="activity-stat-value" id="activities-count-week">0</span><span class="activity-stat-label">Esta semana</span></div>
+                            <div class="activity-stat"><span class="activity-stat-value" id="activities-count-done">0</span><span class="activity-stat-label">Completadas</span></div>
+                        </div>
+                        <div class="activities-toolbar">
+                            <input type="text" id="activities-search" class="status-select" placeholder="Buscar en tareas..." style="width: 200px; min-width: 140px;">
+                            <select id="activities-filter" class="status-select" style="width: auto;">
+                                <option value="pending">Solo pendientes</option>
+                                <option value="overdue">Vencidas</option>
+                                <option value="this_week">Esta semana</option>
+                                <option value="completed">Solo completadas</option>
+                                <option value="all">Todas</option>
+                            </select>
+                            <select id="activities-sort" class="status-select" style="width: auto;">
+                                <option value="due">Por fecha límite</option>
+                                <option value="recent">Más recientes</option>
+                                <option value="project">Por proyecto</option>
+                                <option value="assigned_by">Por quien asignó</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-sm" id="activities-refresh" title="Actualizar"><i data-lucide="refresh-cw" style="width:14px;height:14px;"></i> Actualizar</button>
+                        </div>
+                    </div>
+
+                    <div class="card activities-quick-assign-card" style="margin-bottom: 1.25rem;">
+                        <h3 style="margin:0 0 0.5rem 0; font-size: 1rem;"><i data-lucide="user-plus"></i> Asignar tarea a alguien</h3>
+                        <p style="margin:0 0 0.75rem 0; color: var(--text-muted); font-size: 0.85rem;">Indica el usuario y qué debe hacer. La tarea aparecerá en su lista de Actividades.</p>
+                        <div class="grid-2" style="gap: 0.75rem;">
+                            <div class="input-group">
+                                <label>Usuario</label>
+                                <input type="text" id="activities-assign-to" placeholder="Nombre de usuario (ej. María)" list="activities-users-datalist">
+                                <datalist id="activities-users-datalist"></datalist>
+                            </div>
+                            <div class="input-group">
+                                <label>Tarea / Instrucción</label>
+                                <input type="text" id="activities-assign-title" placeholder="Ej: Crear presupuesto de Luis Pérez">
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">
+                            <button type="button" class="btn btn-primary btn-sm" id="activities-btn-assign"><i data-lucide="send" style="width:14px;height:14px;"></i> Asignar</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="activities-open-chatbot" title="Abrir asistente para más opciones"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Usar asistente</button>
+                        </div>
+                    </div>
+
+                    <div id="activities-list" class="activities-list">
+                        <!-- Tarjetas de actividad se rellenan por JS -->
+                    </div>
+                    <div id="activities-empty" class="activities-empty hidden">
+                        <i data-lucide="inbox" style="width:48px;height:48px;color:var(--text-muted);"></i>
+                        <p>No tienes tareas ni actividades asignadas</p>
+                        <p style="font-size:0.9rem;color:var(--text-muted);">Asigna una a alguien con el formulario de arriba o di al asistente: «Crea una tarea a María para que…»</p>
+                        <button type="button" class="btn btn-primary btn-sm" style="margin-top:0.75rem;" id="activities-empty-open-chatbot"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Abrir asistente</button>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-contracts">
+                    <div class="card" id="contracts-list-card">
+                        <div class="header-with-action contracts-header">
+                            <h3><i data-lucide="file-signature"></i> Contratos</h3>
+                            <div class="contracts-header-actions">
+                                <select id="contracts-status-filter" class="status-select" title="Filtrar por estado">
+                                    <option value="">Todos los estados</option>
+                                    <option value="draft">Borrador</option>
+                                    <option value="sent">Enviado</option>
+                                    <option value="signed">Firmado</option>
+                                    <option value="expired">Expirado</option>
+                                    <option value="cancelled">Cancelado</option>
+                                </select>
+                                <input type="text" id="contracts-search" placeholder="Buscar por cliente, título o ref." class="status-select" style="min-width: 160px;">
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-new-contract">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Nuevo contrato
+                                </button>
+                            </div>
+                        </div>
+                        <div id="contracts-list" class="history-list contracts-list">
+                            <!-- Lista de contratos -->
+                        </div>
+                    </div>
+                    <div class="card hidden" id="contract-form-card">
+                        <div class="header-with-action">
+                            <h3 id="contract-form-title"><i data-lucide="file-signature"></i> Contrato</h3>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-contract-download-pdf" title="Descargar PDF">
+                                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> PDF
+                                </button>
+                                <button type="button" class="btn btn-remove btn-sm" id="btn-contract-delete" title="Eliminar contrato">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Eliminar
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-contract-back">
+                                    <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Volver
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="contract-id">
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Fecha del contrato</label>
+                                <input type="datetime-local" id="contract-date" step="1">
+                            </div>
+                            <div class="input-group">
+                                <label>NIF / CIF</label>
+                                <input type="text" id="contract-client-id" placeholder="Documento ID">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Cliente / Empresa</label>
+                            <input type="text" id="contract-client-name" placeholder="Nombre completo">
+                        </div>
+                        <div class="input-group">
+                            <label>Dirección</label>
+                            <input type="text" id="contract-client-address" placeholder="Calle, Ciudad, CP">
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Email</label>
+                                <input type="email" id="contract-client-email" placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="input-group">
+                                <label>Teléfono</label>
+                                <input type="tel" id="contract-client-phone" placeholder="Ej: 600000000">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Título del contrato</label>
+                            <input type="text" id="contract-title" placeholder="Ej: Contrato de servicios 2025">
+                        </div>
+                        <div class="input-group">
+                            <label>Usar plantilla</label>
+                            <select id="contract-template" class="status-select" style="width: 100%;" title="Elige una plantilla para rellenar título y cláusulas">
+                                <option value="">— Sin plantilla / escribir desde cero —</option>
+                                <optgroup label="Digital y marketing">
+                                    <option value="redes_sociales">Redes sociales (community management)</option>
+                                    <option value="diseno_web">Diseño web</option>
+                                    <option value="mantenimiento_web">Mantenimiento web</option>
+                                    <option value="marketing_digital">Marketing digital</option>
+                                    <option value="contenidos">Creación de contenidos</option>
+                                </optgroup>
+                                <optgroup label="Desarrollo y tecnología">
+                                    <option value="desarrollo_app">Desarrollo de aplicación</option>
+                                    <option value="hosting_dominios">Hosting y dominios</option>
+                                    <option value="soporte_tecnico">Soporte técnico / IT</option>
+                                </optgroup>
+                                <optgroup label="Consultoría y formación">
+                                    <option value="consultoria">Consultoría / asesoría</option>
+                                    <option value="formacion">Formación / cursos</option>
+                                </optgroup>
+                                <optgroup label="Creativo y comunicación">
+                                    <option value="diseno_grafico">Diseño gráfico</option>
+                                    <option value="fotografia_video">Fotografía y/o vídeo</option>
+                                    <option value="traduccion">Traducción</option>
+                                </optgroup>
+                                <optgroup label="General">
+                                    <option value="colaboracion_freelance">Colaboración freelance (marco)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Cláusulas / Términos y condiciones</label>
+                            <textarea id="contract-terms" rows="10" placeholder="Redacta aquí las cláusulas del contrato..."></textarea>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Importe (€)</label>
+                                <input type="number" id="contract-amount" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="input-group">
+                                <label>Estado</label>
+                                <select id="contract-status" class="status-select" style="width: 100%;">
+                                    <option value="draft">Borrador</option>
+                                    <option value="sent">Enviado</option>
+                                    <option value="signed">Firmado</option>
+                                    <option value="expired">Expirado</option>
+                                    <option value="cancelled">Cancelado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Fecha inicio</label>
+                                <input type="date" id="contract-start-date">
+                            </div>
+                            <div class="input-group">
+                                <label>Fecha fin</label>
+                                <input type="date" id="contract-end-date">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Proyecto vinculado</label>
+                            <select id="contract-project-id" class="status-select" style="width: 100%;">
+                                <option value="">— Sin proyecto —</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Presupuesto vinculado (aceptado)</label>
+                            <select id="contract-quote-id" class="status-select" style="width: 100%;" title="Al elegir un presupuesto se rellenan cliente e importe">
+                                <option value="">— Sin presupuesto —</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <button type="button" class="btn btn-primary" id="btn-save-contract">
+                                <i data-lucide="save" style="width: 16px; height: 16px;"></i> Guardar contrato
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card hidden" id="contract-preview-card" style="margin-top: 1rem;">
+                        <h4 style="margin-bottom: 0.5rem;">Vista previa (para PDF)</h4>
+                        <div id="contract-preview" style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.5rem; max-width: 210mm;">
+                            <div id="contract-preview-content"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-calendar">
+                    <div class="card">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="calendar-days"></i> Calendario (citas y facturas)</h3>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <button type="button" class="btn btn-ghost btn-sm" id="calendar-view-prev" title="Mes anterior"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
+                                <span id="calendar-view-month-title" style="min-width:140px;text-align:center;font-weight:600;"></span>
+                                <button type="button" class="btn btn-ghost btn-sm" id="calendar-view-next" title="Mes siguiente"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="calendar-view-today">Hoy</button>
+                            </div>
+                        </div>
+                        <div id="calendar-view-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:1rem;font-size:0.8rem;">
+                            <!-- Días semana + celdas por JS -->
+                        </div>
+                        <div id="calendar-view-day-detail" style="margin-top:1rem;padding:0.75rem;background:var(--bg-main);border-radius:8px;border:1px solid var(--border);min-height:80px;">
+                            <p id="calendar-view-day-placeholder" style="color:var(--text-muted);margin:0;">Haz clic en un día para ver citas y facturas</p>
+                            <div id="calendar-view-day-events" style="display:none;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-appointments">
+                    <div class="card">
+                        <h3><i data-lucide="calendar"></i> Agendar Cita</h3>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Cliente / Motivo</label>
+                                <input type="text" id="appt-client" placeholder="Nombre completo o motivo"
+                                    list="customers-datalist">
+                                <datalist id="customers-datalist"></datalist>
+                            </div>
+                            <div class="input-group">
+                                <label>Teléfono de contacto</label>
+                                <input type="tel" id="appt-phone" placeholder="Ej: 600 000 000">
+                            </div>
+                            <div class="input-group">
+                                <label>Fecha y Hora</label>
+                                <input type="datetime-local" id="appt-date">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Descripción / Notas</label>
+                            <textarea id="appt-desc" placeholder="Detalles de la cita..." rows="2"></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-appt">Programar Cita</button>
+                    </div>
+
+                    <div class="card appointments-agenda-card">
+                        <div class="header-with-action appointments-view-toggle">
+                            <h3><i data-lucide="calendar-days"></i> Tu agenda</h3>
+                            <div class="appointments-view-buttons">
+                                <button type="button" class="btn btn-secondary btn-sm active" id="btn-appts-calendar-view" aria-pressed="true">Calendario</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-appts-list-view" aria-pressed="false">Lista</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-print-appts">
+                                    <i data-lucide="printer" style="width: 16px;"></i> Imprimir
+                                </button>
+                            </div>
+                        </div>
+                        <div id="appointments-calendar-wrap" class="appointments-calendar-wrap">
+                            <div class="calendar-toolbar">
+                                <button type="button" class="btn btn-ghost btn-sm" id="calendar-prev-month" title="Mes anterior"><i data-lucide="chevron-left"></i></button>
+                                <h4 id="calendar-month-title" class="calendar-month-title">Febrero 2025</h4>
+                                <button type="button" class="btn btn-ghost btn-sm" id="calendar-next-month" title="Mes siguiente"><i data-lucide="chevron-right"></i></button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="calendar-today">Hoy</button>
+                            </div>
+                            <div id="appointments-calendar-grid" class="appointments-calendar-grid" role="grid" aria-label="Calendario de citas">
+                                <!-- días de la semana + celdas generadas por JS -->
+                            </div>
+                            <div id="calendar-day-detail" class="calendar-day-detail">
+                                <p class="calendar-day-detail-placeholder">Haz clic en un día para ver sus citas</p>
+                                <div id="calendar-day-appointments" class="calendar-day-appointments"></div>
+                            </div>
+                        </div>
+                        <div id="appointments-list-wrap" class="appointments-list-wrap hidden">
+                            <div id="appointments-list" class="history-list">
+                                <!-- Appointments will be listed here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal confirmación cita agendada -->
+                    <div id="appointment-confirmation-overlay" class="appointment-confirmation-overlay hidden" aria-hidden="true">
+                        <div class="appointment-confirmation-card" role="dialog" aria-labelledby="confirmation-title">
+                            <div class="confirmation-calendar-mini" id="confirmation-calendar-mini"></div>
+                            <h2 id="confirmation-title" class="confirmation-title">¡Cita agendada!</h2>
+                            <div class="confirmation-details" id="confirmation-details"></div>
+                            <div class="confirmation-actions">
+                                <button type="button" class="btn btn-primary" id="confirmation-download-ics">Añadir a mi calendario (.ics)</button>
+                                <button type="button" class="btn btn-secondary" id="confirmation-close">Cerrar</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-customers">
+                    <div class="card" id="customers-birthdays-card" style="display: none;">
+                        <h3><i data-lucide="cake"></i> Cumpleaños este mes</h3>
+                        <div id="customers-birthdays-list" class="history-list" style="max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                    <div class="card">
+                        <h3><i data-lucide="user-plus"></i> Nuevo Cliente</h3>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Nombre / Empresa</label>
+                                <input type="text" id="cust-name" placeholder="Nombre completo">
+                            </div>
+                            <div class="input-group">
+                                <label>NIF / CIF</label>
+                                <input type="text" id="cust-tax-id" placeholder="Documento ID">
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Email</label>
+                                <input type="email" id="cust-email" placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="input-group">
+                                <label>Teléfono</label>
+                                <input type="tel" id="cust-phone" placeholder="Ej: 600000000">
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Categoría</label>
+                                <select id="cust-category" class="status-select" style="width: 100%;">
+                                    <option value="">— Sin categoría —</option>
+                                    <option value="Particular">Particular</option>
+                                    <option value="Empresa">Empresa</option>
+                                    <option value="Recurrente">Recurrente</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Origen del lead</label>
+                                <select id="cust-lead-source" class="status-select" style="width: 100%;">
+                                    <option value="">— Manual —</option>
+                                    <option value="Vendomia">Vendomia</option>
+                                    <option value="Web">Web</option>
+                                    <option value="Referido">Referido</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Cumpleaños / Aniversario</label>
+                                <input type="date" id="cust-birthday" placeholder="AAAA-MM-DD">
+                            </div>
+                            <div class="input-group">
+                                <label>Dirección</label>
+                                <input type="text" id="cust-address" placeholder="Calle, Ciudad, CP">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Notas (historial, preferencias…)</label>
+                            <textarea id="cust-notes" rows="3" placeholder="Notas internas sobre el cliente"></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-customer">Guardar Cliente</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="users"></i> Agenda de Clientes</h3>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                <input type="text" id="customers-search" class="status-select" placeholder="Buscar por nombre, NIF o email" style="width: auto; min-width: 180px;">
+                                <select id="customers-filter-category" class="status-select" style="width: auto; min-width: 140px;">
+                                    <option value="">Todas las categorías</option>
+                                    <option value="Particular">Particular</option>
+                                    <option value="Empresa">Empresa</option>
+                                    <option value="Recurrente">Recurrente</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-export-customers-csv" title="Exportar a CSV">
+                                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> Exportar CSV
+                                </button>
+                            </div>
+                        </div>
+                        <div id="customers-list" class="history-list">
+                            <!-- Customers will be listed here -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-catalog">
+                    <div class="card">
+                        <h3><i data-lucide="plus-circle"></i> Añadir al Catálogo</h3>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Descripción Corta</label>
+                                <input type="text" id="catalog-desc" placeholder="Ej: Mantenimiento Mensual">
+                            </div>
+                            <div class="input-group">
+                                <label>Imagen / Foto</label>
+                                <input type="file" id="catalog-image" accept="image/*">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Descripción Larga / Detalles del Servicio</label>
+                            <textarea id="catalog-long-desc"
+                                placeholder="Detalla aquí las características del producto o servicio..."
+                                rows="4"></textarea>
+                        </div>
+                        <div class="grid-2" style="margin-top: 1rem;">
+                            <div class="input-group">
+                                <label>Precio (€)</label>
+                                <input type="number" id="catalog-price" placeholder="0.00">
+                            </div>
+                            <div class="input-group">
+                                <label>IVA (%)</label>
+                                <input type="number" id="catalog-tax" value="21">
+                            </div>
+                        </div>
+                        <input type="hidden" id="catalog-edit-id" value="">
+                        <button class="btn btn-primary" id="btn-add-catalog">Guardar en Catálogo</button>
+                    </div>
+
+                    <div class="card">
+                        <h3><i data-lucide="book-open"></i> Artículos Guardados</h3>
+                        <div id="catalog-list" class="history-list">
+                            <!-- Catalog items will be listed here -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-expenses">
+                    <div class="card">
+                        <h3><i data-lucide="plus-circle"></i> Nuevo Gasto</h3>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Descripción del Gasto</label>
+                                <input type="text" id="expense-desc" placeholder="Ej: Pago de Autónomos">
+                            </div>
+                            <div class="input-group">
+                                <label>Importe (€)</label>
+                                <input type="number" id="expense-amount" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Categoría</label>
+                                <select id="expense-category" class="status-select" style="width: 100%">
+                                    <option value="Suministros">Suministros</option>
+                                    <option value="Personal">Personal</option>
+                                    <option value="Marketing">Marketing</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Fecha</label>
+                                <input type="date" id="expense-date">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-expense">Guardar Gasto</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="header-with-action">
+                            <h3><i data-lucide="list"></i> Lista de Gastos</h3>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-export-expenses-csv" title="Exportar a CSV">
+                                <i data-lucide="download" style="width: 14px; height: 14px;"></i> Exportar CSV
+                            </button>
+                        </div>
+                        <div id="expenses-list" class="history-list">
+                            <!-- Expenses will be listed here -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-leads">
+                    <div class="card">
+                        <h3><i data-lucide="users"></i> Añadir a la agenda de clientes</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Al rellenar el formulario de Vendomia más abajo, puedes guardar también el contacto aquí para tenerlo en Clientes.</p>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Nombre / Empresa</label>
+                                <input type="text" id="lead-cust-name" placeholder="Nombre completo">
+                            </div>
+                            <div class="input-group">
+                                <label>Email</label>
+                                <input type="email" id="lead-cust-email" placeholder="correo@ejemplo.com">
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Teléfono</label>
+                                <input type="tel" id="lead-cust-phone" placeholder="Ej: 600000000">
+                            </div>
+                            <div class="input-group">
+                                <label>NIF / CIF</label>
+                                <input type="text" id="lead-cust-tax-id" placeholder="Documento ID">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Dirección</label>
+                            <input type="text" id="lead-cust-address" placeholder="Calle, Ciudad, CP">
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-lead-add-customer">
+                            <i data-lucide="user-plus" style="width: 16px; height: 16px;"></i> Guardar en Clientes
+                        </button>
+                    </div>
+                    <div class="card" style="padding: 0; overflow: hidden;">
+                        <h3 style="margin: 1rem 1rem 0;"><i data-lucide="file-edit"></i> Ficha de cliente (Vendomia)</h3>
+                        <p style="margin: 0.5rem 1rem 1rem; font-size: 0.9rem; color: var(--text-muted);">Rellena el formulario. Si quieres que el contacto figure también en tu agenda, usa el formulario de arriba y pulsa «Guardar en Clientes».</p>
+                        <iframe
+                            id="leads-vendomia-iframe"
+                            src="https://vendomia.app/embed/form/view/144/b475f1f3e7cd1791ef053dc55fe8249a"
+                            title="Ficha de cliente - Vendomia"
+                            class="leads-iframe"
+                            allowfullscreen
+                        ></iframe>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-settings">
+                    <div class="card">
+                        <h3><i data-lucide="settings"></i> Configuración</h3>
+
+                        <div class="settings-tabs">
+                            <button type="button" class="settings-tab active" data-settings-tab="empresa">
+                                <i data-lucide="building-2"></i> Empresa
+                            </button>
+                            <button type="button" class="settings-tab" data-settings-tab="integraciones">
+                                <i data-lucide="link"></i> Integraciones
+                            </button>
+                            <button type="button" class="settings-tab" data-settings-tab="documento">
+                                <i data-lucide="file-text"></i> Documento
+                            </button>
+                            <button type="button" class="settings-tab" data-settings-tab="diseno">
+                                <i data-lucide="palette"></i> Diseño y plantillas
+                            </button>
+                            <button type="button" class="settings-tab" data-settings-tab="backup">
+                                <i data-lucide="database"></i> Copia de seguridad
+                            </button>
+                            <button type="button" class="settings-tab admin-only hidden" data-settings-tab="avisos">
+                                <i data-lucide="bell"></i> Avisos
+                            </button>
+                        </div>
+
+                        <div class="settings-tab-panels">
+                            <!-- Empresa -->
+                            <div class="settings-tab-panel" data-settings-panel="empresa">
+                                <div class="input-group">
+                                    <label>Nombre de la Empresa</label>
+                                    <input type="text" id="settings-company-name" placeholder="Ej: Mi Empresa SL">
+                                </div>
+                                <div class="grid-2">
+                                    <div class="input-group">
+                                        <label>CIF / NIF</label>
+                                        <input type="text" id="settings-company-cif" placeholder="B12345678">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Email de contacto</label>
+                                        <input type="email" id="settings-company-email" placeholder="info@empresa.com">
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Dirección Fiscal</label>
+                                    <textarea id="settings-company-address" placeholder="Calle, Ciudad, CP" rows="3"></textarea>
+                                </div>
+                                <div class="input-group">
+                                    <label>IVA por defecto (%)</label>
+                                    <input type="number" id="settings-default-tax" value="21">
+                                </div>
+
+                                <div id="settings-multi-company-card" class="hidden" style="margin-top: 1.5rem;">
+                                    <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                        <i data-lucide="building-2"></i> Multi-empresa
+                                    </h3>
+                                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Añade otra empresa para cambiar entre ellas desde el menú lateral.</p>
+                                    <div class="input-group">
+                                        <label>Nombre de la nueva empresa</label>
+                                        <input type="text" id="new-company-name" placeholder="Ej: Otra Empresa SL">
+                                    </div>
+                                    <div class="grid-2">
+                                        <div class="input-group">
+                                            <label>CIF / NIF</label>
+                                            <input type="text" id="new-company-cif" placeholder="B12345678">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Email</label>
+                                            <input type="email" id="new-company-email" placeholder="info@empresa.com">
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Dirección</label>
+                                        <input type="text" id="new-company-address" placeholder="Calle, Ciudad, CP">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>IVA por defecto (%)</label>
+                                        <input type="number" id="new-company-default-tax" value="21">
+                                    </div>
+                                    <button type="button" class="btn btn-secondary" id="btn-create-company">
+                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Añadir otra empresa
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Integraciones -->
+                            <div class="settings-tab-panel hidden" data-settings-panel="integraciones">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="link"></i> Integración Vendomia
+                                </h3>
+                                <div class="input-group">
+                                    <label>API Key de Vendomia</label>
+                                    <input type="password" id="settings-vendomia-api-key" placeholder="Pega aquí tu token de la API de Vendomia" autocomplete="off">
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">
+                                        Se obtiene en Vendomia → Usuarios → tu usuario → Configuración → API. Activa el acceso por API y copia el token.
+                                    </small>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="cloud"></i> Backup por email
+                                </h3>
+                                <div class="input-group">
+                                    <label>Enviar copia de seguridad a este email</label>
+                                    <input type="email" id="settings-backup-email" placeholder="backup@empresa.com">
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="calendar"></i> Google Calendar
+                                </h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);">Sincronizar citas con Google Calendar (crear/actualizar eventos al guardar). <strong>Próximamente:</strong> se podrá conectar tu cuenta y exportar las citas automáticamente. De momento puedes usar la exportación a .ics desde la sección Citas.</p>
+                            </div>
+
+                            <!-- Documento -->
+                            <div class="settings-tab-panel hidden" data-settings-panel="documento">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="image"></i> Logo en documentos</h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Logo que aparece en la cabecera de presupuestos y facturas (vista previa y PDF). Si está vacío se usa el logo por defecto de la app (logo.png).</p>
+                                <div class="input-group">
+                                    <label>URL del logo</label>
+                                    <input type="url" id="settings-document-logo-url" placeholder="https://tu-servidor.com/logo.png (o deja vacío para logo.png)">
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">
+                                        Indica la URL pública de tu imagen (PNG, JPG, SVG). Debe ser accesible desde internet para que se vea en el PDF.
+                                    </small>
+                                    <div id="settings-document-logo-preview" class="document-logo-preview" style="margin-top:0.5rem;display:none;">
+                                        <label style="font-size:0.85rem;color:var(--text-muted);">Vista previa:</label>
+                                        <img id="settings-document-logo-img" src="" alt="Logo" style="max-height:60px;max-width:200px;object-fit:contain;margin-top:0.25rem;display:block;">
+                                    </div>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="mail"></i> Email de envío</h3>
+                                <div class="input-group">
+                                    <label>Nombre del remitente (aparece en «De»)</label>
+                                    <input type="text" id="settings-sender-name" placeholder="Ej: Mi Empresa SL">
+                                </div>
+                                <div class="input-group">
+                                    <label>Idioma del documento (presupuesto/factura PDF)</label>
+                                    <select id="settings-document-language" class="status-select" style="width: 100%;">
+                                        <option value="es">Español</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                                <h4 style="margin: 1rem 0 0.5rem; font-size: 0.95rem;">Plantilla para «Enviar por email»</h4>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Usa <code>{{tipo}}</code> (Presupuesto/Factura) y <code>{{id}}</code> (número del documento). Si está vacío se usan valores por defecto.</p>
+                                <div class="input-group">
+                                    <label>Asunto por defecto</label>
+                                    <input type="text" id="settings-document-email-subject" placeholder="Ej: {{tipo}} {{id}} - Mi Empresa">
+                                </div>
+                                <div class="input-group">
+                                    <label>Mensaje por defecto</label>
+                                    <textarea id="settings-document-email-body" rows="3" placeholder="Adjunto encontrará el {{tipo}} {{id}}. Si tiene alguna duda, no dude en contactarnos."></textarea>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="credit-card"></i> Pagos
+                                </h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Elige qué formas de pago quieres mostrar en presupuestos y facturas. Aparecerán en el pie del documento.</p>
+                                <div class="input-group">
+                                    <label>Formas de pago a mostrar</label>
+                                    <div class="payment-methods-checkboxes" style="display:flex;flex-wrap:wrap;gap:0.75rem 1.5rem;">
+                                        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><input type="checkbox" id="settings-payment-method-transferencia" value="transferencia"> Transferencia bancaria</label>
+                                        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><input type="checkbox" id="settings-payment-method-efectivo" value="efectivo"> Efectivo</label>
+                                        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><input type="checkbox" id="settings-payment-method-online" value="online"> Tarjeta / Pago online</label>
+                                        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><input type="checkbox" id="settings-payment-method-bizum" value="bizum"> Bizum</label>
+                                        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><input type="checkbox" id="settings-payment-method-cheque" value="cheque"> Cheque / Talón</label>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Datos para transferencia bancaria</label>
+                                    <textarea id="settings-payment-transfer-details" rows="4" placeholder="Ej:&#10;IBAN: ES12 3456 7890 1234 5678 9012&#10;Titular: Mi Empresa SL&#10;Concepto: Nº factura + nombre del cliente"></textarea>
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Se mostrará en el documento cuando tengas marcada «Transferencia bancaria».</small>
+                                </div>
+                                <div class="input-group">
+                                    <label style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        Mostrar botón «Pagar» en facturas <input type="checkbox" id="settings-payment-enabled">
+                                    </label>
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Muestra un botón que enlaza a la URL de pago online (Stripe, PayPal, etc.).</small>
+                                </div>
+                                <div class="input-group">
+                                    <label>URL del enlace de pago (Stripe, PayPal, Redsys, etc.)</label>
+                                    <input type="url" id="settings-payment-link-url" placeholder="https://...">
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">
+                                        Puedes usar una URL fija o con placeholder, ej. https://pago.com?id={id}
+                                    </small>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="hash"></i> Numeración de facturas
+                                </h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Si rellenas prefijo y siguiente número, las nuevas facturas usarán IDs secuenciales (ej. FAC-2025-0001). Si lo dejas vacío o en 0, se usará el formato automático.</p>
+                                <div class="grid-2">
+                                    <div class="input-group">
+                                        <label>Prefijo (ej. FAC)</label>
+                                        <input type="text" id="settings-invoice-prefix" placeholder="FAC" maxlength="20">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Siguiente número</label>
+                                        <input type="number" id="settings-invoice-next-number" min="0" placeholder="1 (0 = automático)">
+                                    </div>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="file-text"></i> Pie de página del documento
+                                </h3>
+                                <div class="input-group">
+                                    <label>Texto o HTML del pie (presupuesto/factura PDF)</label>
+                                    <textarea id="settings-document-footer" rows="6" placeholder="Ej: aviso legal RGPD, firma, datos de contacto... Para el logo usa: &lt;img src=&quot;logo.png&quot; alt=&quot;Logo&quot;&gt; (logo de la app). Si lo dejas vacío se mostrará «Validez del presupuesto: 15 días» y «Gracias por su confianza.»"></textarea>
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">
+                                        Aparece al final del documento en vista previa y en el PDF. Puedes incluir avisos legales, firma o enlaces.
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Diseño y plantillas -->
+                            <div class="settings-tab-panel hidden" data-settings-panel="diseno">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="layout-template"></i> Plantillas de documento
+                                </h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    Define varios estilos de presupuesto/factura y elige cuál usar por defecto. Más adelante podrás aplicar una plantilla concreta al generar cada documento.
+                                </p>
+                                <div class="card" style="background: rgba(15,23,42,0.03); border-radius: 0.75rem; padding: 0.75rem 0.75rem 0.5rem; border: 1px dashed var(--border);">
+                                    <div class="grid-2" style="gap: 0.75rem;">
+                                        <div class="input-group">
+                                            <label>Plantilla por defecto</label>
+                                            <select id="settings-default-template" class="status-select" style="width: 100%;">
+                                                <option value="classic">Clásica limpia</option>
+                                                <option value="modern">Moderna con banda lateral</option>
+                                                <option value="compact">Compacta (más líneas por página)</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Aplicar a</label>
+                                            <select id="settings-template-scope" class="status-select" style="width: 100%;">
+                                                <option value="both">Presupuestos y facturas</option>
+                                                <option value="quotes">Solo presupuestos</option>
+                                                <option value="invoices">Solo facturas</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                                        Por ahora las plantillas cambian el diseño visual del documento. Más adelante se podrán guardar plantillas completas de textos y bloques.
+                                    </p>
+                                </div>
+
+                                <h3 style="margin: 1.5rem 0 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="palette"></i> Diseño del Documento
+                                </h3>
+                                <div class="input-group">
+                                    <label>Fondo del presupuesto / factura</label>
+                                    <select id="doc-theme-select" class="status-select" style="width: 100%;">
+                                        <option value="none">Sin fondo</option>
+                                        <option value="full">Fondo a página completa</option>
+                                        <option value="side">Fondo lateral junto a los datos del cliente</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Imagen de fondo (solo se guarda en este navegador)</label>
+                                    <input type="file" id="doc-bg-file" accept="image/*">
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">
+                                        La imagen se guarda de forma local (en este navegador) para no ralentizar el servidor. 
+                                        Si cambias de dispositivo, tendrás que volver a seleccionarla.
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Avisos -->
+                            <div class="settings-tab-panel hidden" data-settings-panel="avisos">
+                                <div class="input-group" style="margin-bottom: 1.5rem;">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="settings-alerts-enabled" checked>
+                                        Activar todos los avisos en la aplicación
+                                    </label>
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Desmarca para desactivar todos los avisos (ventana al iniciar, recordatorios de citas, etc.).</small>
+                                </div>
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
+                                    <i data-lucide="calendar-clock"></i> Avisos de citas
+                                </h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Cuando una cita se acerca, se muestra un aviso en la app 5 minutos antes y 1 minuto antes (solo si tienes la pestaña abierta).</p>
+                                <div class="input-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="settings-appointment-reminders-enabled" checked>
+                                        Activar avisos de citas (5 min y 1 min antes)
+                                    </label>
+                                    <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Desmarca para desactivar los recordatorios para todos los usuarios.</small>
+                                </div>
+                            </div>
+                            <div class="settings-tab-panel hidden" data-settings-panel="backup">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);"><i data-lucide="database"></i> Copia de seguridad</h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Descarga una copia de tus datos (presupuestos, facturas, clientes, gastos, citas) en JSON.</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-secondary" id="btn-backup-data">
+                                        <i data-lucide="download" style="width: 16px; height: 16px;"></i> Descargar copia
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="btn-backup-email">
+                                        <i data-lucide="mail" style="width: 16px; height: 16px;"></i> Enviar copia por email
+                                    </button>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);"><i data-lucide="cloud"></i> Destino en la nube y copias programadas</h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Puedes enviar la copia por email y/o a una URL (webhook) para guardarla en Drive, OneDrive u otro sistema. Con el cron programado, las copias se ejecutan automáticamente.</p>
+                                <div class="grid-2" style="gap: 1rem;">
+                                    <div class="input-group">
+                                        <label>Frecuencia de copia automática</label>
+                                        <select id="settings-backup-schedule" class="status-select" style="width:100%;">
+                                            <option value="off">No programado</option>
+                                            <option value="daily">Diario</option>
+                                            <option value="weekly">Semanal</option>
+                                            <option value="monthly">Mensual</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group" id="settings-backup-day-wrap" style="display:none;">
+                                        <label>Día</label>
+                                        <select id="settings-backup-schedule-day" class="status-select" style="width:100%;">
+                                            <option value="1">Lunes</option>
+                                            <option value="2">Martes</option>
+                                            <option value="3">Miércoles</option>
+                                            <option value="4">Jueves</option>
+                                            <option value="5">Viernes</option>
+                                            <option value="6">Sábado</option>
+                                            <option value="0">Domingo</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group" id="settings-backup-monthday-wrap" style="display:none;">
+                                        <label>Día del mes (1-28)</label>
+                                        <input type="number" id="settings-backup-schedule-monthday" min="1" max="28" value="1" class="status-select" style="width:100%;">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Hora (0-23)</label>
+                                        <input type="number" id="settings-backup-schedule-hour" min="0" max="23" value="8" class="status-select" style="width:100%;">
+                                    </div>
+                                </div>
+                                <div class="input-group" style="margin-top:0.75rem;">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="settings-backup-dest-email" checked>
+                                        Enviar también por email (usa el email de "Backup por email" en Integraciones)
+                                    </label>
+                                </div>
+                                <div class="input-group" style="margin-top:0.5rem;">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="settings-backup-dest-webhook">
+                                        Enviar a una URL (webhook) para guardar en Drive, OneDrive, etc.
+                                    </label>
+                                    <input type="url" id="settings-backup-webhook-url" placeholder="https://..." class="status-select" style="width:100%;margin-top:0.5rem;" title="URL que recibe un POST con el JSON de la copia (ej. Zapier, IFTTT, Make, o tu propio servidor)">
+                                </div>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;"><strong>Google Drive / OneDrive:</strong> usa un flujo en Zapier, Make (Integromat) o IFTTT que reciba un webhook y suba el archivo a tu carpeta. La copia se envía en el cuerpo del POST (JSON). <strong>Programar:</strong> en el servidor configura un cron que ejecute <code>php cron_backup.php</code> cada hora (o cada día); el script comprobará si toca hacer copia según la frecuencia elegida.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">Mensajes a usuarios (solo administrador)</p>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Envía un aviso a cualquier usuario; lo verá al iniciar sesión.</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+                                    <button type="button" class="btn btn-secondary admin-only hidden" id="btn-open-send-message">
+                                        <i data-lucide="message-circle" style="width: 16px; height: 16px;"></i> Enviar mensaje a usuario
+                                    </button>
+                                </div>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">Base de datos (producción)</p>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Ejecuta todas las actualizaciones pendientes de tablas y columnas en un solo paso.</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    <button type="button" class="btn btn-primary admin-only hidden" id="btn-upgrade-database" title="Actualizar toda la base de datos">
+                                        <i data-lucide="database" style="width: 16px; height: 16px;"></i> Actualizar base de datos
+                                    </button>
+                                </div>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;">Esquemas individuales:</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-secondary admin-only hidden" id="btn-upgrade-projects-schema" title="Crea las tablas de Proyectos si no existen">
+                                        <i data-lucide="folder-kanban" style="width: 16px; height: 16px;"></i> Proyectos
+                                    </button>
+                                    <button type="button" class="btn btn-secondary admin-only hidden" id="btn-upgrade-deletion-requests-schema" title="Crea la tabla de solicitudes de eliminación si no existe">
+                                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Solicitudes eliminación
+                                    </button>
+                                </div>
+
+                                <hr style="border-color: var(--border); margin: 1.5rem 0;">
+                                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);"><i data-lucide="upload"></i> Importar datos (CSV o Excel)</h3>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Sube un archivo CSV o Excel (.xlsx, .xls) con cabecera en la primera fila. CSV: separador coma (,) o punto y coma (;). En Excel se usa la primera hoja.</p>
+                                <div class="grid-2" style="gap: 1rem;">
+                                    <div class="input-group">
+                                        <label>Clientes</label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="file" id="import-customers-csv" accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="max-width: 220px;">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="btn-import-customers" title="Importar filas como clientes (CSV o Excel)">
+                                                <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Importar
+                                            </button>
+                                        </div>
+                                        <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Columnas: name, tax_id, address, email, phone (nombre obligatorio)</small>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Proyectos</label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="file" id="import-projects-csv" accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="max-width: 220px;">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="btn-import-projects" title="Importar filas como proyectos (CSV o Excel)">
+                                                <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Importar
+                                            </button>
+                                        </div>
+                                        <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Columnas: name, description, client_name, status, start_date, end_date, budget</small>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Facturas</label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="file" id="import-invoices-csv" accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="max-width: 220px;">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="btn-import-invoices" title="Importar filas como facturas (CSV o Excel)">
+                                                <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Importar
+                                            </button>
+                                        </div>
+                                        <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Columnas: id, date, client_name, client_id, client_address, client_email, client_phone, notes, status, subtotal, tax_amount, total_amount</small>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Presupuestos</label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="file" id="import-quotes-csv" accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="max-width: 220px;">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="btn-import-quotes" title="Importar filas como presupuestos (CSV o Excel)">
+                                                <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Importar
+                                            </button>
+                                        </div>
+                                        <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Columnas: id, date, client_name, client_id, client_address, client_email, client_phone, notes, status, subtotal, tax_amount, total_amount</small>
+                                    </div>
+                                </div>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem;">Descargar plantilla CSV de ejemplo: <a href="#" id="link-template-customers" class="link">Clientes</a> · <a href="#" id="link-template-projects" class="link">Proyectos</a> · <a href="#" id="link-template-invoices" class="link">Facturas</a> · <a href="#" id="link-template-quotes" class="link">Presupuestos</a></p>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <button class="btn btn-primary" id="btn-save-settings">
+                                Guardar Configuración
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section view-section hidden" id="section-admin">
+                    <div class="card admin-only">
+                        <h3><i data-lucide="message-circle"></i> Enviar mensaje a usuario</h3>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">El mensaje se mostrará al usuario al iniciar sesión en la ventana de avisos.</p>
+                        <div class="input-group">
+                            <label>Destinatario</label>
+                            <select id="admin-message-to-user" class="status-select" style="width: 100%;">
+                                <option value="">— Selecciona usuario —</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Asunto (opcional)</label>
+                            <input type="text" id="admin-message-subject" placeholder="Asunto del mensaje">
+                        </div>
+                        <div class="input-group">
+                            <label>Mensaje</label>
+                            <textarea id="admin-message-body" rows="3" placeholder="Escribe el mensaje..."></textarea>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-send-user-message">Enviar mensaje</button>
+                    </div>
+                    <div class="card">
+                        <h3><i data-lucide="user-plus"></i> Gestionar Usuarios</h3>
+                        <div class="grid-2">
+                            <div class="input-group">
+                                <label>Usuario</label>
+                                <input type="text" id="admin-username">
+                            </div>
+                            <div class="input-group">
+                                <label>Password</label>
+                                <input type="password" id="admin-password">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Rol</label>
+                            <select id="admin-role" class="status-select" style="width: 100%">
+                                <option value="user">Usuario Estándar</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-save-user">Guardar Usuario</button>
+                    </div>
+                    <div class="card">
+                        <h3><i data-lucide="users"></i> Lista de Usuarios</h3>
+                        <div id="admin-users-list" class="history-list"></div>
+                    </div>
+                </section>
+
+                <section class="preview-section" id="quote-preview-container">
+                    <div class="preview-card" id="quote-preview">
+                        <div id="preview-side-bg" class="preview-side-bg hidden"></div>
+                        <div class="preview-header">
+                            <div class="header-main">
+                                <img src="logo.png" alt="Logo" class="preview-logo">
+                                <div class="company-info" id="company-display">
+                                    <h1 id="preview-company-name">Mi Empresa SL</h1>
+                                    <p id="preview-company-details">Calle Innovación 123, 28001 Madrid<br>CIF: B12345678
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="quote-meta">
+                                <h2>PRESUPUESTO</h2>
+                                <p><strong>Nº:</strong> <span id="preview-quote-id">NUEVO</span></p>
+                                <p><strong>Fecha:</strong> <span id="preview-date">22/01/2024</span></p>
+                            </div>
+                        </div>
+
+                        <div class="preview-parties">
+                            <div class="preview-client">
+                                <h4>PARA:</h4>
+                                <p id="preview-client-name">Nombre del Cliente</p>
+                                <p id="preview-client-details">Dirección del Cliente<br>NIF: 00000000X</p>
+                            </div>
+                        </div>
+
+                        <table class="preview-table">
+                            <thead>
+                                <tr>
+                                    <th>Descripción</th>
+                                    <th>Cant.</th>
+                                    <th>Precio</th>
+                                    <th>IVA</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="preview-items-body">
+                                <!-- Items will be injected here -->
+                            </tbody>
+                        </table>
+
+                        <div class="preview-summary">
+                            <div class="summary-line">
+                                <span>Subtotal</span>
+                                <span id="preview-subtotal">0,00 €</span>
+                            </div>
+                            <div class="summary-line">
+                                <span>IVA</span>
+                                <span id="preview-tax">0,00 €</span>
+                            </div>
+                            <div class="summary-line total">
+                                <span>TOTAL</span>
+                                <span id="preview-total">0,00 €</span>
+                            </div>
+                        </div>
+
+                        <div class="preview-notes" id="preview-notes-container">
+                            <h4>Notas:</h4>
+                            <p id="preview-notes-text"></p>
+                        </div>
+
+                        <div class="preview-signature hidden" id="preview-signature-container">
+                            <h4>Firma del cliente:</h4>
+                            <img id="preview-signature-img" alt="Firma" style="max-width: 200px; max-height: 80px; border: 1px solid var(--border); border-radius: 4px;">
+                        </div>
+
+                        <div class="preview-footer">
+                            <div id="preview-payment-methods" class="preview-payment-methods hidden" style="margin-bottom:0.75rem;padding:0.5rem 0;border-top:1px solid var(--border);font-size:0.85rem;"></div>
+                            <div id="preview-footer-custom" class="preview-footer-custom hidden"></div>
+                            <div id="preview-footer-default">
+                                <p>Validez del presupuesto: 15 días.</p>
+                                <p>Gracias por su confianza.</p>
+                            </div>
+                            <button class="btn btn-secondary btn-sm no-print" id="btn-copy-summary" type="button" style="margin-top:0.75rem;">
+                                <i data-lucide="clipboard-list"></i> Copiar resumen
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <nav class="mobile-nav">
+        <button class="mobile-nav-item active" onclick="document.getElementById('nav-dashboard').click()">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Inicio</span>
+        </button>
+        <button class="mobile-nav-item" onclick="document.getElementById('nav-editor').click()">
+            <i data-lucide="edit-3"></i>
+            <span>Editor</span>
+        </button>
+        <button class="mobile-nav-item" onclick="document.getElementById('nav-history').click()">
+            <i data-lucide="history"></i>
+            <span>Historial</span>
+        </button>
+        <button class="mobile-nav-item" onclick="document.getElementById('nav-invoices').click()">
+            <i data-lucide="file-text"></i>
+            <span>Facturas</span>
+        </button>
+        <button class="mobile-nav-item" onclick="document.getElementById('nav-projects').click()">
+            <i data-lucide="folder-kanban"></i>
+            <span>Proyectos</span>
+        </button>
+        <button class="mobile-nav-item mobile-nav-more" id="mobile-nav-btn-more" type="button" aria-label="Más opciones">
+            <i data-lucide="menu"></i>
+            <span>Más</span>
+        </button>
+    </nav>
+    <div id="mobile-nav-more-overlay" class="mobile-nav-more-overlay hidden" aria-hidden="true"></div>
+    <div id="mobile-nav-more-panel" class="mobile-nav-more-panel hidden" aria-hidden="true">
+        <div class="mobile-nav-more-header">
+            <h3>Más opciones</h3>
+            <button type="button" class="mobile-nav-more-close" id="mobile-nav-more-close" aria-label="Cerrar"><i data-lucide="x"></i></button>
+        </div>
+        <div class="mobile-nav-more-list">
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-activities').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="list-todo"></i>
+                <span>Actividades / Tareas</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-contracts').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="file-signature"></i>
+                <span>Contratos</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-appointments').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="calendar"></i>
+                <span>Citas</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-calendar').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="calendar-days"></i>
+                <span>Calendario</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-catalog').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="book-open"></i>
+                <span>Catálogo</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-leads').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="user-plus"></i>
+                <span>Leads</span>
+            </button>
+            <button type="button" class="mobile-nav-item" onclick="document.getElementById('nav-settings').click(); document.getElementById('mobile-nav-more-close').click();">
+                <i data-lucide="settings"></i>
+                <span>Config</span>
+            </button>
+            <button type="button" class="mobile-nav-item mobile-nav-logout" onclick="document.getElementById('btn-logout').click(); document.getElementById('mobile-nav-more-close').click();" title="Cerrar sesión">
+                <i data-lucide="log-out"></i>
+                <span>Salir</span>
+            </button>
+        </div>
+    </div>
+    <div class="mobile-actions" id="mobile-editor-actions">
+        <button class="btn btn-accent" onclick="document.getElementById('btn-save').click()" title="Guardar">
+            <i data-lucide="save"></i>
+        </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('btn-duplicate').click()" title="Duplicar">
+            <i data-lucide="copy"></i>
+        </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('btn-export-einvoice').click()" title="Factura electrónica">
+            <i data-lucide="file-output"></i>
+        </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('btn-whatsapp').click()" title="WhatsApp">
+            <i data-lucide="message-circle"></i>
+        </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('btn-print').click()" title="Imprimir">
+            <i data-lucide="printer"></i>
+        </button>
+        <button class="btn btn-primary" onclick="document.getElementById('btn-download').click()" title="Descargar">
+            <i data-lucide="download"></i>
+        </button>
+    </div>
+    <div id="modal-email-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3><i data-lucide="mail"></i> Enviar por email</h3>
+            <div class="input-group">
+                <label>Destinatario</label>
+                <input type="email" id="modal-email-to" placeholder="cliente@email.com">
+            </div>
+            <div class="input-group">
+                <label>Asunto</label>
+                <input type="text" id="modal-email-subject" placeholder="Presupuesto / Factura">
+            </div>
+            <div class="input-group">
+                <label>Mensaje (opcional)</label>
+                <textarea id="modal-email-body" rows="3" placeholder="Adjunto encontrará el documento..."></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" id="modal-email-cancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="modal-email-send"><i data-lucide="send" style="width:14px;height:14px;"></i> Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-signature-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3><i data-lucide="pen-tool"></i> Firma del cliente</h3>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">El cliente puede firmar en el recuadro. La firma se guardará en el presupuesto.</p>
+            <canvas id="signature-canvas" width="400" height="180" style="border: 1px solid var(--border); border-radius: 8px; display: block; touch-action: none; background: #fff;"></canvas>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem;">
+                <button type="button" class="btn btn-secondary" id="signature-clear">Borrar</button>
+                <button type="button" class="btn btn-secondary" id="modal-signature-cancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="modal-signature-ok"><i data-lucide="check" style="width:14px;height:14px;"></i> Aceptar y guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-customer-overlay" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 520px;">
+            <h3><i data-lucide="user"></i> <span id="modal-customer-title">Cliente</span></h3>
+            <div id="modal-customer-details" style="font-size: 0.9rem; margin-bottom: 1rem;"></div>
+            <div class="card" style="margin-top: 0.75rem; padding: 0.75rem;">
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i data-lucide="file-text"></i> Presupuestos y facturas</h4>
+                <div id="modal-customer-documents" class="history-list" style="max-height: 160px; overflow-y: auto; font-size: 0.85rem;"></div>
+            </div>
+            <div class="card" style="margin-top: 0.75rem; padding: 0.75rem;">
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i data-lucide="history"></i> Log de actividad</h4>
+                <div id="modal-customer-audit" class="history-list" style="max-height: 140px; overflow-y: auto; font-size: 0.8rem;"></div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" id="modal-customer-edit">Editar</button>
+                <button type="button" class="btn btn-primary" id="modal-customer-close">Cerrar</button>
+            </div>
+        </div>
+    </div>
+    <!-- Chatbot Asistente (visible solo cuando hay sesión) -->
+    <div id="chatbot-wrap" class="chatbot-wrap hidden">
+        <button type="button" id="chatbot-fab" class="chatbot-fab" aria-label="Abrir asistente">
+            <i data-lucide="message-circle" class="chatbot-fab-icon"></i>
+            <span class="chatbot-fab-pulse"></span>
+        </button>
+        <div id="chatbot-panel" class="chatbot-panel hidden">
+            <div class="chatbot-header">
+                <div class="chatbot-header-title">
+                    <span class="chatbot-avatar"><i data-lucide="bot"></i></span>
+                    <div>
+                        <h2>Asistente</h2>
+                        <span class="chatbot-status">Listo para ayudarte</span>
+                    </div>
+                </div>
+                <button type="button" id="chatbot-close" class="chatbot-btn-close" aria-label="Cerrar"><i data-lucide="x"></i></button>
+            </div>
+            <div class="chatbot-quick-actions">
+                <button type="button" class="chatbot-chip" data-cmd="Crear cliente">+ Cliente</button>
+                <button type="button" class="chatbot-chip" data-cmd="Crear presupuesto">+ Presupuesto</button>
+                <button type="button" class="chatbot-chip" data-cmd="Crear factura">+ Factura</button>
+                <button type="button" class="chatbot-chip" data-cmd="Crear proyecto">+ Proyecto</button>
+                <button type="button" class="chatbot-chip" data-cmd="Nueva cita">+ Cita</button>
+                <button type="button" class="chatbot-chip" data-cmd="Lista clientes">Clientes</button>
+                <button type="button" class="chatbot-chip" data-cmd="Lista presupuestos">Presupuestos</button>
+                <button type="button" class="chatbot-chip" data-cmd="Lista facturas">Facturas</button>
+                <button type="button" class="chatbot-chip" data-cmd="Resumen del mes">Resumen mes</button>
+                <button type="button" class="chatbot-chip" data-cmd="Qué tengo hoy">Hoy</button>
+                <button type="button" class="chatbot-chip" data-cmd="Asignar actividad">+ Asignar actividad</button>
+                <button type="button" class="chatbot-chip" data-cmd="Asignar tarea">+ Asignar tarea</button>
+                <button type="button" class="chatbot-chip" data-cmd="Ir a facturas">Ir facturas</button>
+                <button type="button" class="chatbot-chip" data-cmd="Ayuda">Ayuda</button>
+            </div>
+            <div id="chatbot-messages" class="chatbot-messages"></div>
+            <div class="chatbot-input-wrap">
+                <input type="text" id="chatbot-input" class="chatbot-input" placeholder="Ej: Crea un cliente Juan Pérez, email juan@mail.com" autocomplete="off">
+                <button type="button" id="chatbot-send" class="chatbot-send" aria-label="Enviar"><i data-lucide="send"></i></button>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container" class="toast-container"></div>
+    <script src="app.js?v=10"></script>
+</body>
+
+</html>

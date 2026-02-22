@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Test login desde el navegador</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 20px auto; padding: 20px; }
+        pre { background: #f0f0f0; padding: 10px; overflow-x: auto; font-size: 12px; white-space: pre-wrap; }
+        input, button { padding: 8px; margin: 4px 0; }
+        button { background: #d21f2b; color: white; border: none; cursor: pointer; }
+        .ok { color: green; }
+        .err { color: red; }
+    </style>
+</head>
+<body>
+    <h2>Test login (desde el navegador)</h2>
+    <p>Abre esta página desde <strong>http://localhost/presup/test_login.html</strong> (misma URL que la app).</p>
+    
+    <p>Usuario: <input type="text" id="user" value="admin"></p>
+    <p>Contraseña: <input type="password" id="pass" value="admin123"></p>
+    <button type="button" id="btn-login">Enviar login (igual que la app)</button>
+    
+    <div id="out" style="margin-top: 1rem;"></div>
+    
+    <hr>
+    <p><a href="index.html">Abrir la app</a> | <a href="check_login_local.php">Restablecer contraseña admin</a></p>
+
+    <script>
+        document.getElementById('btn-login').onclick = async function() {
+            const out = document.getElementById('out');
+            out.innerHTML = 'Enviando...';
+            const fd = new FormData();
+            fd.append('action', 'login');
+            fd.append('username', document.getElementById('user').value.trim());
+            fd.append('password', document.getElementById('pass').value);
+            try {
+                const res = await fetch('api.php?t=' + Date.now(), { method: 'POST', body: fd, credentials: 'same-origin' });
+                const text = await res.text();
+                let html = '<h3>Respuesta</h3>';
+                html += '<p><strong>Estado HTTP:</strong> ' + res.status + ' ' + res.statusText + '</p>';
+                html += '<p><strong>Headers Set-Cookie:</strong> ' + (res.headers.get('Set-Cookie') || '(ninguno)') + '</p>';
+                html += '<p><strong>Body (texto):</strong></p><pre>' + escapeHtml(text) + '</pre>';
+                let data = null;
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch (e) {
+                    html += '<p class="err">No es JSON válido.</p>';
+                }
+                if (data) {
+                    if (data.status === 'success') {
+                        html += '<p class="ok"><strong>Login OK.</strong> <a href="index.html">Abre la app</a> y recarga: deberías estar dentro.</p>';
+                    } else {
+                        html += '<p class="err">Mensaje: ' + escapeHtml(data.message || 'Sin mensaje') + '</p>';
+                    }
+                }
+                out.innerHTML = html;
+            } catch (e) {
+                out.innerHTML = '<p class="err">Error: ' + escapeHtml(e.message) + '</p>';
+            }
+        };
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    </script>
+</body>
+</html>
