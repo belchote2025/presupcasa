@@ -36,7 +36,8 @@
 }
 
 .auth-mode .mobile-nav,
-.auth-mode .mobile-actions {
+.auth-mode .mobile-actions,
+.auth-mode .scroll-to-top-btn {
     display: none !important;
 }
 
@@ -275,9 +276,12 @@ body {
 .top-bar-menu-btn:hover {
     background: var(--border);
 }
-.top-bar-menu-btn i {
+.top-bar-menu-btn i,
+.top-bar-menu-btn svg {
     width: 22px;
     height: 22px;
+    min-width: 22px;
+    min-height: 22px;
 }
 
 .top-bar {
@@ -1233,9 +1237,19 @@ img[loading="lazy"] {
     transition: color 0.2s;
 }
 
-.mobile-nav-item i {
+/* Lucide reemplaza <i> por <svg>; aplicar tamaño a ambos para que los iconos se vean */
+.mobile-nav-item i,
+.mobile-nav-item svg {
     width: 20px;
     height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    display: block;
+}
+.mobile-nav-item svg {
+    stroke: currentColor;
+    fill: none;
 }
 
 .mobile-nav-item.active {
@@ -1313,9 +1327,12 @@ img[loading="lazy"] {
     background: var(--border);
     color: var(--text-main);
 }
-.mobile-nav-more-close i {
+.mobile-nav-more-close i,
+.mobile-nav-more-close svg {
     width: 22px;
     height: 22px;
+    min-width: 22px;
+    min-height: 22px;
 }
 .mobile-nav-more-list {
     overflow-y: auto;
@@ -1333,10 +1350,14 @@ img[loading="lazy"] {
     text-align: left;
     border-radius: 0;
 }
-.mobile-nav-more-list .mobile-nav-item i {
+.mobile-nav-more-list .mobile-nav-item i,
+.mobile-nav-more-list .mobile-nav-item svg {
     width: 22px;
     height: 22px;
+    min-width: 22px;
+    min-height: 22px;
     margin-right: 0.75rem;
+    flex-shrink: 0;
 }
 
 .mobile-actions {
@@ -1359,7 +1380,23 @@ img[loading="lazy"] {
     border-radius: 50%;
     padding: 0;
     justify-content: center;
+    align-items: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: inline-flex;
+}
+
+.mobile-actions .btn i,
+.mobile-actions .btn svg {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    display: block;
+}
+.mobile-actions .btn svg {
+    stroke: currentColor;
+    fill: none;
 }
 
 @media (max-width: 768px) {
@@ -1698,9 +1735,19 @@ img[loading="lazy"] {
         background: rgba(210, 31, 43, 0.12);
     }
 
-    .mobile-nav-item i {
+    .mobile-nav-item i,
+    .mobile-nav-item svg {
         width: 22px;
         height: 22px;
+        min-width: 22px;
+        min-height: 22px;
+        display: block;
+        flex-shrink: 0;
+    }
+
+    .mobile-actions .btn i,
+    .mobile-actions .btn svg {
+        display: block;
     }
 
     .mobile-nav-more-panel {
@@ -1820,6 +1867,23 @@ img[loading="lazy"] {
         min-height: 40px;
     }
 
+    /* Iconos en botones (Lucide genera SVG): tamaño y visibilidad en móvil */
+    .btn i,
+    .btn svg,
+    .btn [data-lucide] {
+        flex-shrink: 0;
+    }
+    .btn svg,
+    .btn i {
+        min-width: 1rem;
+        min-height: 1rem;
+    }
+    .mobile-actions .btn svg,
+    .mobile-actions .btn i {
+        min-width: 24px;
+        min-height: 24px;
+    }
+
     .login-card {
         margin: 1rem;
         padding: 2rem 1.5rem;
@@ -1934,6 +1998,137 @@ textarea:required:invalid:not(:placeholder-shown) {
 input:required:valid:not(:placeholder-shown),
 textarea:required:valid:not(:placeholder-shown) {
     border-color: var(--accent);
+}
+
+/* Botón subir al inicio (solo móvil) */
+.scroll-to-top-btn {
+    display: none;
+    position: fixed;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s, transform 0.2s;
+}
+.scroll-to-top-btn:hover {
+    background: var(--border);
+}
+.scroll-to-top-btn i,
+.scroll-to-top-btn svg {
+    width: 22px;
+    height: 22px;
+}
+@media (min-width: 769px) {
+    .scroll-to-top-btn { display: none !important; }
+}
+@media (max-width: 768px) {
+    .scroll-to-top-btn {
+        display: flex;
+    }
+    .scroll-to-top-btn.hidden {
+        display: none !important;
+    }
+}
+
+/* Vista pública: Aceptar presupuesto */
+.accept-quote-view {
+    min-height: 100vh;
+    background: var(--bg-main);
+    padding: 2rem 1rem;
+    box-sizing: border-box;
+}
+.accept-quote-card {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+.accept-quote-title {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.accept-quote-title i,
+.accept-quote-title svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+#accept-quote-error { margin-bottom: 1rem; }
+.accept-quote-summary {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--input-bg);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+}
+.accept-quote-success {
+    padding: 1rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: #10b981;
+}
+.accept-quote-form-intro {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+.accept-quote-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.accept-quote-actions .btn {
+    min-height: 48px;
+    padding: 0.75rem 1.25rem;
+}
+.accept-quote-canvas {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: block;
+    touch-action: none;
+    background: #fff;
+    max-width: 100%;
+}
+@media (max-width: 768px) {
+    .accept-quote-view {
+        padding: 1rem 0.75rem;
+    }
+    .accept-quote-card {
+        padding: 1.25rem 1rem;
+    }
+    .accept-quote-view .input-group input {
+        min-height: 48px;
+        font-size: 16px;
+    }
+    #accept-quote-submit {
+        width: 100%;
+        justify-content: center;
+        min-height: 48px;
+    }
+}
+
+/* Listas con mensaje vacío: más aire en móvil */
+@media (max-width: 768px) {
+    #history-list .history-item:only-child,
+    #invoices-list .history-item:only-child {
+        padding: 1.5rem 1rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
 }
 
 /* Tooltip básico */
@@ -2312,14 +2507,17 @@ textarea:required:valid:not(:placeholder-shown) {
 }
 
 @media (max-width: 768px) {
-    /* FAB bien por encima del menú para que no se solapen */
+    /* Chatbot a la izquierda para no solaparse con el menú de acciones del editor (derecha) */
     .chatbot-wrap {
-        bottom: 6.5rem;
-        right: 0.75rem;
+        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+        left: 0.75rem;
+        right: auto;
     }
     .chatbot-panel {
+        left: 0;
+        right: auto;
         width: calc(100vw - 1rem);
-        right: 0.5rem;
+        max-width: calc(100vw - 1rem);
         bottom: calc(56px + 0.5rem);
         height: 60vh;
     }

@@ -352,10 +352,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window._appointmentReminderInterval) clearInterval(window._appointmentReminderInterval);
         window._appointmentReminderInterval = setInterval(checkAppointmentReminders, 30 * 1000);
         setTimeout(checkAppointmentReminders, 12 * 1000);
-        if (typeof lucide !== 'undefined') {
-            requestAnimationFrame(() => {
-                lucide.createIcons();
-            });
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            requestAnimationFrame(() => { lucide.createIcons(); });
+            setTimeout(() => { lucide.createIcons(); }, 150);
+        } else if (window.lucide && window.lucide.createIcons) {
+            requestAnimationFrame(() => { window.lucide.createIcons(); });
+            setTimeout(() => { window.lucide.createIcons(); }, 150);
         }
     }
 
@@ -482,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appContainer.classList.add('hidden');
         document.body.classList.add('auth-mode');
         document.getElementById('chatbot-wrap')?.classList.add('hidden');
+        setTimeout(function () { if (loginUser) loginUser.focus(); }, 100);
     }
 
     // --- LOGIN ---
@@ -607,6 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loginScreen.classList.add('hidden');
         if (appContainer) appContainer.classList.add('hidden');
         acceptQuoteView.classList.remove('hidden');
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        else if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 
         const acceptQuoteError = document.getElementById('accept-quote-error');
         const acceptQuoteSummary = document.getElementById('accept-quote-summary');
@@ -4348,9 +4353,21 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         const canvas = document.getElementById('signature-canvas');
         if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     });
-    document.getElementById('modal-signature-cancel').addEventListener('click', () => {
-        document.getElementById('modal-signature-overlay').classList.add('hidden');
+    var modalSignatureOverlay = document.getElementById('modal-signature-overlay');
+    function closeSignatureModal() {
+        if (modalSignatureOverlay) modalSignatureOverlay.classList.add('hidden');
         pendingAcceptQuoteId = null;
+    }
+    document.getElementById('modal-signature-cancel').addEventListener('click', closeSignatureModal);
+    if (modalSignatureOverlay) {
+        modalSignatureOverlay.addEventListener('click', function (e) {
+            if (e.target === modalSignatureOverlay) closeSignatureModal();
+        });
+    }
+    document.addEventListener('keydown', function signatureModalEscape(e) {
+        if (e.key === 'Escape' && modalSignatureOverlay && !modalSignatureOverlay.classList.contains('hidden')) {
+            closeSignatureModal();
+        }
     });
     document.getElementById('modal-signature-ok').addEventListener('click', async () => {
         const id = pendingAcceptQuoteId;
@@ -4373,8 +4390,7 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
             } catch (err) {
                 showToast('Presupuesto aceptado, pero hubo un problema al generar la factura. Revisa el editor.', 'error');
             }
-            document.getElementById('modal-signature-overlay').classList.add('hidden');
-            pendingAcceptQuoteId = null;
+            closeSignatureModal();
             if (createdInvoiceId) {
                 showToast(`Presupuesto aceptado y factura ${createdInvoiceId} generada.`, 'success');
             } else {
@@ -4994,8 +5010,17 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         modalEmailBody.value = bodyTemplate.replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{id\}\}/g, id);
         modalEmailOverlay.classList.remove('hidden');
         if (window.lucide) lucide.createIcons();
+        setTimeout(function () { if (modalEmailTo) modalEmailTo.focus(); }, 100);
     });
     document.getElementById('modal-email-cancel').addEventListener('click', () => modalEmailOverlay.classList.add('hidden'));
+    modalEmailOverlay.addEventListener('click', function (e) {
+        if (e.target === modalEmailOverlay) modalEmailOverlay.classList.add('hidden');
+    });
+    document.addEventListener('keydown', function emailModalEscape(e) {
+        if (e.key === 'Escape' && modalEmailOverlay && !modalEmailOverlay.classList.contains('hidden')) {
+            modalEmailOverlay.classList.add('hidden');
+        }
+    });
     document.getElementById('modal-email-send').addEventListener('click', async () => {
         const to = modalEmailTo.value.trim();
         if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
@@ -7144,6 +7169,40 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
     })();
 
     boot();
+
+    var btnScrollToTop = document.getElementById('btn-scroll-to-top');
+    if (btnScrollToTop) {
+        function toggleScrollToTop() {
+            if (document.body.classList.contains('auth-mode')) return;
+            if (window.innerWidth > 768) {
+                btnScrollToTop.classList.add('hidden');
+                return;
+            }
+            if (window.scrollY > 300) {
+                btnScrollToTop.classList.remove('hidden');
+            } else {
+                btnScrollToTop.classList.add('hidden');
+            }
+        }
+        window.addEventListener('scroll', toggleScrollToTop, { passive: true });
+        window.addEventListener('resize', toggleScrollToTop);
+        btnScrollToTop.addEventListener('click', function () {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        toggleScrollToTop();
+    }
+
+    setTimeout(function runLucideIcons() {
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        else if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }, 400);
+    setTimeout(function focusLoginIfVisible() {
+        var su = document.getElementById('login-user');
+        var ls = document.getElementById('login-screen');
+        if (document.body.classList.contains('auth-mode') && su && ls && !ls.classList.contains('hidden')) {
+            su.focus();
+        }
+    }, 500);
     if ('serviceWorker' in navigator) {
         const base = window.location.pathname.replace(/\/[^/]*$/, '') || '';
         navigator.serviceWorker.register((base ? base + '/' : '') + 'sw.js').catch(() => {});

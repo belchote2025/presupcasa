@@ -70,27 +70,27 @@
     </div>
 
     <!-- Vista pública: el cliente abre el enlace, ve el presupuesto y firma para aceptarlo -->
-    <div id="accept-quote-view" class="hidden" style="min-height: 100vh; background: var(--bg); padding: 2rem 1rem; box-sizing: border-box;">
-        <div class="card" style="max-width: 560px; margin: 0 auto;">
-            <h2 style="margin: 0 0 1rem; font-size: 1.25rem;"><i data-lucide="file-signature"></i> Aceptar presupuesto</h2>
-            <p id="accept-quote-error" class="error-text hidden" style="margin-bottom: 1rem;"></p>
-            <div id="accept-quote-summary" style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-sub); border-radius: 8px; font-size: 0.9rem;"></div>
-            <div id="accept-quote-success" class="hidden" style="padding: 1rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; color: #10b981;">
+    <div id="accept-quote-view" class="hidden accept-quote-view">
+        <div class="card accept-quote-card">
+            <h2 class="accept-quote-title"><i data-lucide="file-signature"></i> Aceptar presupuesto</h2>
+            <p id="accept-quote-error" class="error-text hidden"></p>
+            <div id="accept-quote-summary" class="accept-quote-summary"></div>
+            <div id="accept-quote-success" class="accept-quote-success hidden">
                 <strong>Presupuesto aceptado.</strong> Gracias por su confianza.
             </div>
             <div id="accept-quote-form" class="hidden">
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Firme a continuación o indique su nombre para aceptar el presupuesto.</p>
-                <div class="input-group" style="margin-bottom: 0.75rem;">
+                <p class="accept-quote-form-intro">Firme a continuación o indique su nombre para aceptar el presupuesto.</p>
+                <div class="input-group">
                     <label>Nombre (quien acepta)</label>
                     <input type="text" id="accept-quote-name" placeholder="Ej: Juan Pérez" maxlength="200">
                 </div>
-                <div class="input-group" style="margin-bottom: 0.75rem;">
+                <div class="input-group">
                     <label>Firma (opcional si escribe el nombre)</label>
-                    <canvas id="accept-quote-canvas" width="400" height="140" style="border: 1px solid var(--border); border-radius: 8px; display: block; touch-action: none; background: #fff; max-width: 100%;"></canvas>
-                    <button type="button" class="btn btn-secondary btn-sm" id="accept-quote-clear" style="margin-top: 0.35rem;">Borrar firma</button>
+                    <canvas id="accept-quote-canvas" width="400" height="140" class="accept-quote-canvas"></canvas>
+                    <button type="button" class="btn btn-secondary btn-sm" id="accept-quote-clear">Borrar firma</button>
                 </div>
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                    <button type="button" class="btn btn-primary" id="accept-quote-submit"><i data-lucide="check" style="width:16px;height:16px;"></i> Aceptar presupuesto</button>
+                <div class="accept-quote-actions">
+                    <button type="button" class="btn btn-primary" id="accept-quote-submit"><i data-lucide="check"></i> Aceptar presupuesto</button>
                 </div>
             </div>
         </div>
@@ -1932,6 +1932,9 @@
             </button>
         </div>
     </div>
+    <button type="button" id="btn-scroll-to-top" class="scroll-to-top-btn hidden" aria-label="Subir al inicio" title="Subir al inicio">
+        <i data-lucide="arrow-up"></i>
+    </button>
     <div class="mobile-actions" id="mobile-editor-actions">
         <button class="btn btn-accent" onclick="document.getElementById('btn-save').click()" title="Guardar">
             <i data-lucide="save"></i>
