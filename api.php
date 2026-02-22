@@ -1096,6 +1096,8 @@ try {
                     $params_count[] = "%$tag_history%";
                     $params_count[] = $tag_history;
                 }
+                $has_valid_until = false;
+                try { $has_valid_until = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'valid_until'")->rowCount() > 0; } catch (Exception $e) {}
                 if ($session_role === 'admin') {
                     $count_sql = "SELECT COUNT(*) FROM quotes $where";
                     $stmt = $pdo->prepare($count_sql);
@@ -1103,6 +1105,7 @@ try {
                     $total = (int)$stmt->fetchColumn();
                     $fields = "id, date, client_name, status, total_amount, user_id";
                     if ($has_tags_quotes) $fields .= ", tags";
+                    if ($has_valid_until) $fields .= ", valid_until";
                     $sql = "SELECT $fields FROM quotes $where ORDER BY date DESC LIMIT $limit OFFSET $offset";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params_count);
@@ -1160,6 +1163,7 @@ try {
                     $total = (int)$stmt->fetchColumn();
                     $fields = "id, date, client_name, status, total_amount, user_id";
                     if ($has_tags_quotes) $fields .= ", tags";
+                    if ($has_valid_until) $fields .= ", valid_until";
                     $sql = "SELECT $fields FROM quotes $where_user ORDER BY date DESC LIMIT $limit OFFSET $offset";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params_count);
@@ -1324,6 +1328,15 @@ try {
                 } catch (PDOException $e) {
                     if (strpos($e->getMessage(), 'quote_signature') === false) throw $e;
                 }
+            }
+            if (array_key_exists('valid_until', $data)) {
+                try {
+                    if ($pdo->query("SHOW COLUMNS FROM quotes LIKE 'valid_until'")->rowCount() === 0) {
+                        $pdo->exec("ALTER TABLE quotes ADD COLUMN valid_until DATE NULL DEFAULT NULL");
+                    }
+                    $validUntil = isset($data['valid_until']) && trim($data['valid_until'] ?? '') !== '' ? trim($data['valid_until']) : null;
+                    $pdo->prepare("UPDATE quotes SET valid_until = ? WHERE id = ?")->execute([$validUntil, $data['id']]);
+                } catch (Exception $e) {}
             }
             $stmt = $pdo->prepare("DELETE FROM quote_items WHERE quote_id = ?");
             $stmt->execute([$data['id']]);
@@ -2060,6 +2073,12 @@ try {
                         $pdo->exec("ALTER TABLE invoices ADD COLUMN project_id INT NULL");
                         $allChanges[] = "invoices.project_id";
                     }
+                }
+                // 4b. Validez del presupuesto (opcional)
+                $chk = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'valid_until'");
+                if ($chk->rowCount() === 0) {
+                    $pdo->exec("ALTER TABLE quotes ADD COLUMN valid_until DATE NULL DEFAULT NULL");
+                    $allChanges[] = "quotes.valid_until";
                 }
                 // 5. Numeración de facturas (prefijo + siguiente número) en company_settings
                 $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE 'invoice_prefix'");

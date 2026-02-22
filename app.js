@@ -727,6 +727,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const auditCard = document.getElementById('audit-log-card');
         if (auditCard) auditCard.style.display = 'none';
         setRecurringInvoiceUI(false);
+        const validUntilWrap = document.getElementById('editor-valid-until-wrap');
+        if (validUntilWrap) validUntilWrap.style.display = 'none';
+        const validUntilInput = document.getElementById('editor-valid-until');
+        if (validUntilInput) validUntilInput.value = '';
     }
 
     window.getNextInvoiceId = async function() {
@@ -1740,6 +1744,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 : status === 'rejected'
                                     ? 'background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3);'
                                     : 'background:rgba(148,163,184,0.1);color:#94a3b8;border-color:rgba(148,163,184,0.3);';
+                        let validBadge = '';
+                        if (q.valid_until && String(q.valid_until).trim()) {
+                            const validDate = new Date(String(q.valid_until).substring(0, 10));
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            validDate.setHours(0, 0, 0, 0);
+                            if (validDate < today) {
+                                validBadge = '<span style="display:inline-block;margin-left:0.35rem;margin-top:0.25rem;padding:0.1rem 0.5rem;border-radius:999px;font-size:0.65rem;font-weight:600;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">Caducado</span>';
+                            } else {
+                                const daysLeft = Math.ceil((validDate - today) / (1000 * 60 * 60 * 24));
+                                if (daysLeft <= 7) {
+                                    validBadge = '<span style="display:inline-block;margin-left:0.35rem;margin-top:0.25rem;padding:0.1rem 0.5rem;border-radius:999px;font-size:0.65rem;font-weight:600;background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">Caduca en ' + daysLeft + ' día(s)</span>';
+                                }
+                            }
+                        }
                         return `
                         <div class="history-item">
                             <div style="flex:1">
@@ -1749,7 +1768,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <br>
                                 <span style="display:inline-block;margin-top:0.25rem;padding:0.1rem 0.6rem;border-radius:999px;font-size:0.7rem;font-weight:600;border:1px solid;${statusColor}">
                                     ${statusLabel}
-                                </span>
+                                </span>${validBadge}
                             </div>
                             <div style="display:flex;gap:0.5rem;align-items:center;">
                                 ${status !== 'accepted' ? `
@@ -4559,6 +4578,10 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
             quoteNotesInput.value = q.notes || '';
             const tagsInputQ = document.getElementById('editor-document-tags');
             if (tagsInputQ) tagsInputQ.value = (q.tags || '').trim();
+            const validUntilInput = document.getElementById('editor-valid-until');
+            if (validUntilInput) validUntilInput.value = (q.valid_until && String(q.valid_until).substring(0, 10)) || '';
+            const validUntilWrap = document.getElementById('editor-valid-until-wrap');
+            if (validUntilWrap) validUntilWrap.style.display = '';
             // Validar y mapear items
             if (q.items && Array.isArray(q.items)) {
                 items = q.items.map(i => ({
@@ -4657,6 +4680,7 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         
         const projectSelect = document.getElementById('editor-project-id');
         const tagsEl = document.getElementById('editor-document-tags');
+        const validUntilEl = document.getElementById('editor-valid-until');
         const quote = {
             id: currentQuoteId || `PRE-${Date.now()}`,
             date: new Date().toISOString().slice(0, 19).replace('T', ' '),
@@ -4666,7 +4690,8 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
             items: items,
             totals: { subtotal: items.reduce((a, b) => a + (b.quantity * b.price), 0), tax: items.reduce((a, b) => a + (b.quantity * b.price * (b.tax / 100)), 0), total: items.reduce((a, b) => a + (b.quantity * b.price * (1 + b.tax / 100)), 0) },
             project_id: (projectSelect && projectSelect.value) ? projectSelect.value : '',
-            tags: (tagsEl && tagsEl.value) ? tagsEl.value.trim() : ''
+            tags: (tagsEl && tagsEl.value) ? tagsEl.value.trim() : '',
+            valid_until: (validUntilEl && validUntilEl.value) ? validUntilEl.value : ''
         };
         try {
             const isInvoice = (currentQuoteId && currentQuoteId.startsWith('FAC-'));
@@ -5028,6 +5053,8 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
             const isQuote = currentQuoteId && !String(currentQuoteId).startsWith('FAC-');
             if (isQuote) btnAcceptLink.classList.remove('hidden'); else btnAcceptLink.classList.add('hidden');
         }
+        const validUntilWrap = document.getElementById('editor-valid-until-wrap');
+        if (validUntilWrap) validUntilWrap.style.display = (currentQuoteId && !String(currentQuoteId).startsWith('FAC-')) ? '' : 'none';
     }
 
     const btnCopyAcceptLink = document.getElementById('btn-copy-accept-link');
