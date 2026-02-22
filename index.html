@@ -39,22 +39,21 @@
                 <input type="password" id="login-pass" placeholder="••••••••">
             </div>
             <button class="btn btn-primary btn-full" id="btn-login">Entrar</button>
-            <p class="login-links" style="margin-top: 1rem; text-align: center;">
-                <button type="button" id="link-forgot-password" class="link-button" style="background:none;border:none;color: var(--primary); font-size: 0.9rem; cursor: pointer; text-decoration: underline; padding: 0;">¿Olvidaste tu contraseña?</button>
+            <p class="login-links">
+                <button type="button" id="link-forgot-password" class="link-button" aria-label="Recuperar contraseña">¿Olvidaste tu contraseña?</button>
             </p>
-            <p id="login-error" class="error-text hidden"
-                style="color: var(--danger); margin-top: 1rem; text-align: center;">Usuario o contraseña incorrectos</p>
+            <p id="login-error" class="error-text hidden">Usuario o contraseña incorrectos</p>
 
             <!-- Flujo recuperación de contraseña -->
-            <div id="password-reset-panel" class="hidden" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-                <h4 style="margin-bottom: 0.75rem; font-size: 1rem;">Restablecer contraseña</h4>
+            <div id="password-reset-panel" class="hidden">
+                <h4>Restablecer contraseña</h4>
                 <div id="reset-request-form">
                     <div class="input-group">
                         <label>Usuario</label>
                         <input type="text" id="reset-username" placeholder="Tu usuario">
                     </div>
                     <button class="btn btn-secondary btn-full" id="btn-request-reset">Enviar enlace</button>
-                    <p id="reset-request-msg" class="hidden" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);"></p>
+                    <p id="reset-request-msg" class="hidden"></p>
                 </div>
                 <div id="reset-form" class="hidden">
                     <div class="input-group">
@@ -62,9 +61,11 @@
                         <input type="password" id="reset-new-password" placeholder="••••••••">
                     </div>
                     <button class="btn btn-primary btn-full" id="btn-do-reset">Cambiar contraseña</button>
-                    <p id="reset-msg" class="hidden" style="margin-top: 0.5rem; font-size: 0.85rem;"></p>
+                    <p id="reset-msg" class="hidden"></p>
                 </div>
-                <p style="margin-top: 0.75rem;"><button type="button" id="link-back-login" class="link-button" style="background:none;border:none;color: var(--text-muted); font-size: 0.85rem; cursor: pointer; text-decoration: underline; padding: 0;">Volver al inicio de sesión</button></p>
+                <p class="login-links login-links-back">
+                    <button type="button" id="link-back-login" class="link-button link-button-muted" aria-label="Volver al inicio de sesión">Volver al inicio de sesión</button>
+                </p>
             </div>
         </div>
     </div>
@@ -772,10 +773,10 @@
                             </div>
                         </div>
                         <div class="activities-stats" id="activities-stats">
-                            <div class="activity-stat"><span class="activity-stat-value" id="activities-count-pending">0</span><span class="activity-stat-label">Pendientes</span></div>
-                            <div class="activity-stat activity-stat-clickable" title="Filtrar por vencidas"><span class="activity-stat-value" id="activities-count-overdue">0</span><span class="activity-stat-label">Vencidas</span></div>
-                            <div class="activity-stat activity-stat-clickable" title="Filtrar por esta semana"><span class="activity-stat-value" id="activities-count-week">0</span><span class="activity-stat-label">Esta semana</span></div>
-                            <div class="activity-stat"><span class="activity-stat-value" id="activities-count-done">0</span><span class="activity-stat-label">Completadas</span></div>
+                            <div class="activity-stat" data-filter="pending" title="Filtrar: pendientes"><span class="activity-stat-value" id="activities-count-pending">0</span><span class="activity-stat-label">Pendientes</span></div>
+                            <div class="activity-stat activity-stat-clickable" data-filter="overdue" title="Filtrar por vencidas"><span class="activity-stat-value" id="activities-count-overdue">0</span><span class="activity-stat-label">Vencidas</span></div>
+                            <div class="activity-stat activity-stat-clickable" data-filter="this_week" title="Filtrar por esta semana"><span class="activity-stat-value" id="activities-count-week">0</span><span class="activity-stat-label">Esta semana</span></div>
+                            <div class="activity-stat" data-filter="completed" title="Filtrar: completadas"><span class="activity-stat-value" id="activities-count-done">0</span><span class="activity-stat-label">Completadas</span></div>
                         </div>
                         <div class="activities-toolbar">
                             <input type="text" id="activities-search" class="status-select" placeholder="Buscar en tareas..." style="width: 200px; min-width: 140px;">

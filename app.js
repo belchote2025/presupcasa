@@ -478,6 +478,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('alerts-modal-close')?.click();
         }
     });
+    document.addEventListener('keydown', function alertsModalEscape(e) {
+        if (e.key !== 'Escape') return;
+        var alertsModal = document.getElementById('dashboard-alerts-modal');
+        if (alertsModal && !alertsModal.classList.contains('hidden')) {
+            document.getElementById('alerts-modal-close')?.click();
+        }
+    });
 
     function showLogin() {
         loginScreen.classList.remove('hidden');
@@ -2185,14 +2192,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dates = [p.start_date, p.end_date].filter(Boolean).map(d => new Date(d).toLocaleDateString('es-ES')).join(' → ') || '—';
                 const taskCount = (p.task_count ?? 0) || 0;
                 const tasksDone = (p.tasks_completed ?? 0) || 0;
-                const taskProgress = taskCount > 0 ? `<span class="project-task-progress" title="Tareas">${tasksDone}/${taskCount} tareas</span>` : '';
+                const pct = taskCount > 0 ? Math.round((tasksDone / taskCount) * 100) : 0;
+                const taskProgress = taskCount > 0
+                    ? `<div class="project-task-progress-bar-wrap"><span class="project-task-progress" title="Tareas">${tasksDone}/${taskCount}</span><div class="project-task-progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div style="width:${pct}%;height:100%;background:var(--accent);border-radius:999px;"></div></div></div>`
+                    : '';
+                const statusClass = (p.status && ['planning', 'in_progress', 'on_hold', 'completed', 'cancelled'].indexOf(p.status) >= 0) ? p.status : '';
                 return `
-                    <div class="history-item project-item">
+                    <div class="project-item" data-status="${(p.status || '').replace(/"/g, '&quot;')}">
                         <div class="project-item-main">
                             <strong class="project-item-name">${(p.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</strong>${userBadge}
                             <div class="project-item-meta"><small>${client} · ${budgetStr}${dates !== '—' ? ' · ' + dates : ''}</small></div>
                             <div class="project-item-badges">
-                                <span class="project-status-badge" style="background:${sc};color:var(--text);">${statusLabel}</span>
+                                <span class="project-status-badge ${statusClass}" style="${statusClass ? '' : 'background:' + sc + ';color:var(--text-main);'}">${statusLabel}</span>
                                 ${taskProgress}
                             </div>
                         </div>
@@ -2322,7 +2333,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tasksList.innerHTML = tasks.map(t => {
                     const dueStr = t.due_date ? new Date(t.due_date).toLocaleDateString('es-ES') : '';
                     const checked = t.completed === 1 || t.completed === '1' || t.completed === true;
-                    const assigneeName = (t.assigned_to_username || '—').replace(/</g, '&lt;');
                     const assigneeId = t.assigned_to_user_id || '';
                     const optUsers = usersForAssignment.map(u => `<option value="${u.id}" ${u.id == assigneeId ? 'selected' : ''}>${(u.username || '').replace(/</g, '&lt;')}</option>`).join('');
                     const assigneeSelect = `<select class="status-select" style="width:auto;min-width:100px;font-size:0.8rem;" onchange="updateTaskAssignee(${projectId}, ${t.id}, this)" title="Cambiar responsable">${optUsers ? '<option value="">— Sin asignar —</option>' + optUsers : '<option value="">— Sin asignar —</option>'} </select>`;
@@ -2330,14 +2340,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const safeDesc = (t.description || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
                     const safeDue = (t.due_date || '');
                     return `
-                        <div class="history-item" data-task-id="${t.id}" data-task-title="${safeTitle}" data-task-desc="${safeDesc}" data-task-due="${safeDue}" data-task-completed="${checked ? '1' : '0'}" data-task-sort="${t.sort_order || 0}">
-                            <div style="flex:1;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                                <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectTask(${projectId}, ${t.id}, this.checked)" title="Marcar completada">
-                                <span style="${checked ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${(t.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
-                                ${dueStr ? `<small style="color:var(--text-muted);">${dueStr}</small>` : ''}
-                                <span style="color:var(--text-muted);font-size:0.8rem;">→</span>
-                                ${assigneeSelect}
-                            </div>
+                        <div class="project-task-row ${checked ? 'completed' : ''}" data-task-id="${t.id}" data-task-title="${safeTitle}" data-task-desc="${safeDesc}" data-task-due="${safeDue}" data-task-completed="${checked ? '1' : '0'}" data-task-sort="${t.sort_order || 0}">
+                            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectTask(${projectId}, ${t.id}, this.checked)" title="Marcar completada" aria-label="Marcar completada">
+                            <span class="project-task-title">${(t.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                            ${dueStr ? `<span class="project-task-meta">${dueStr}</span>` : ''}
+                            ${assigneeSelect}
                             <button class="btn btn-remove btn-sm" onclick="deleteProjectTask(${projectId}, ${t.id})" title="Eliminar tarea"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
                         </div>
                     `;
@@ -3345,10 +3352,11 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
                 const due = (t.due_date || '').toString().slice(0, 10);
                 const dueStr = due ? new Date(t.due_date).toLocaleDateString('es-ES') : '';
                 let dueBadge = '';
+                let dueState = '';
                 if (!done && due) {
-                    if (due < today) dueBadge = '<span class="activity-badge overdue">Vencida</span>';
-                    else if (due === today) dueBadge = '<span class="activity-badge due-today">Vence hoy</span>';
-                    else if (due <= weekEnd) dueBadge = '<span class="activity-badge project">' + dueStr + ' (esta semana)</span>';
+                    if (due < today) { dueBadge = '<span class="activity-badge overdue">Vencida</span>'; dueState = 'overdue'; }
+                    else if (due === today) { dueBadge = '<span class="activity-badge due-today">Vence hoy</span>'; dueState = 'today'; }
+                    else if (due <= weekEnd) { dueBadge = '<span class="activity-badge project">' + dueStr + ' (esta semana)</span>'; dueState = 'week'; }
                     else dueBadge = '<span class="activity-badge project">' + dueStr + '</span>';
                 } else if (done) dueBadge = '<span class="activity-badge done">Completada</span>';
                 const assignedBy = (t.assigned_by_username || '').trim() ? 'Asignado por ' + (t.assigned_by_username || '').replace(/</g, '&lt;') : '';
@@ -3357,7 +3365,7 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
                 const desc = (t.description || '').toString().trim().replace(/</g, '&lt;');
                 const createdStr = t.created_at ? new Date(t.created_at).toLocaleDateString('es-ES') : '';
                 return `
-                    <div class="activity-card ${done ? 'completed' : ''}" data-task-id="${t.task_id}" data-project-id="${t.project_id}">
+                    <div class="activity-card ${done ? 'completed' : ''}" data-task-id="${t.task_id}" data-project-id="${t.project_id}" data-due-state="${dueState}">
                         <div class="activity-card-header">
                             <div class="activity-card-check">
                                 <input type="checkbox" ${done ? 'checked' : ''} aria-label="Marcar como completada" onchange="toggleActivityCompleted(${t.task_id}, ${t.project_id}, this.checked)">
@@ -3417,13 +3425,12 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
     document.getElementById('activities-filter')?.addEventListener('change', () => loadActivitiesPage());
     document.getElementById('activities-sort')?.addEventListener('change', () => loadActivitiesPage());
     document.getElementById('activities-refresh')?.addEventListener('click', () => loadActivitiesPage());
-    document.getElementById('activities-count-overdue')?.closest('.activity-stat')?.addEventListener('click', () => {
-        const f = document.getElementById('activities-filter');
-        if (f) { f.value = 'overdue'; loadActivitiesPage(); }
-    });
-    document.getElementById('activities-count-week')?.closest('.activity-stat')?.addEventListener('click', () => {
-        const f = document.getElementById('activities-filter');
-        if (f) { f.value = 'this_week'; loadActivitiesPage(); }
+    document.getElementById('activities-stats')?.addEventListener('click', function (e) {
+        var stat = e.target.closest('.activity-stat[data-filter]');
+        if (!stat) return;
+        var filterVal = stat.getAttribute('data-filter');
+        var f = document.getElementById('activities-filter');
+        if (f && filterVal) { f.value = filterVal; loadActivitiesPage(); }
     });
     let activitiesSearchTimeout = null;
     document.getElementById('activities-search')?.addEventListener('input', () => {
@@ -3613,8 +3620,20 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         }
     };
 
-    document.getElementById('modal-customer-close').addEventListener('click', () => {
-        document.getElementById('modal-customer-overlay').classList.add('hidden');
+    var modalCustomerOverlay = document.getElementById('modal-customer-overlay');
+    function closeCustomerModal() {
+        if (modalCustomerOverlay) modalCustomerOverlay.classList.add('hidden');
+    }
+    document.getElementById('modal-customer-close').addEventListener('click', closeCustomerModal);
+    if (modalCustomerOverlay) {
+        modalCustomerOverlay.addEventListener('click', function (e) {
+            if (e.target === modalCustomerOverlay) closeCustomerModal();
+        });
+    }
+    document.addEventListener('keydown', function customerModalEscape(e) {
+        if (e.key === 'Escape' && modalCustomerOverlay && !modalCustomerOverlay.classList.contains('hidden')) {
+            closeCustomerModal();
+        }
     });
     document.getElementById('modal-customer-edit').addEventListener('click', async () => {
         if (!currentEditingCustomerId) return;
