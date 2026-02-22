@@ -927,12 +927,31 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.quote-meta h2').textContent = docTitle;
         document.getElementById('preview-quote-id').textContent = currentQuoteId || 'NUEVO';
         // Etiquetas idioma
-        const labels = lang === 'en' ? { no: 'No.', date: 'Date', para: 'To', desc: 'Description', qty: 'Qty', price: 'Price', vat: 'VAT', total: 'Total', subtotal: 'Subtotal', notes: 'Notes', signature: 'Client signature:', validity: 'Quote valid for 15 days.', thanks: 'Thank you for your trust.' } : { no: 'Nº', date: 'Fecha', para: 'PARA:', desc: 'Descripción', qty: 'Cant.', price: 'Precio', vat: 'IVA', total: 'TOTAL', subtotal: 'Subtotal', notes: 'Notas:', signature: 'Firma del cliente:', validity: 'Validez del presupuesto: 15 días.', thanks: 'Gracias por su confianza.' };
+        const labels = lang === 'en' ? { no: 'No.', date: 'Date', para: 'To', desc: 'Description', qty: 'Qty', price: 'Price', vat: 'VAT', total: 'Total', subtotal: 'Subtotal', notes: 'Notes', signature: 'Client signature:', validity: 'Quote valid for 15 days.', thanks: 'Thank you for your trust.', validUntil: 'Valid until:' } : { no: 'Nº', date: 'Fecha', para: 'PARA:', desc: 'Descripción', qty: 'Cant.', price: 'Precio', vat: 'IVA', total: 'TOTAL', subtotal: 'Subtotal', notes: 'Notas:', signature: 'Firma del cliente:', validity: 'Validez del presupuesto: 15 días.', thanks: 'Gracias por su confianza.', validUntil: 'Válido hasta:' };
         const meta = document.querySelector('.quote-meta');
         if (meta) {
             const ps = meta.querySelectorAll('p');
             if (ps[0] && ps[0].querySelector('strong')) ps[0].querySelector('strong').textContent = labels.no + ': ';
             if (ps[1] && ps[1].querySelector('strong')) ps[1].querySelector('strong').textContent = labels.date + ': ';
+        }
+        // Válido hasta (solo presupuestos): vista previa y PDF
+        const validUntilWrap = document.getElementById('preview-valid-until-wrap');
+        const validUntilSpan = document.getElementById('preview-valid-until');
+        const validUntilLabel = document.getElementById('preview-valid-until-label');
+        if (validUntilWrap && validUntilSpan && validUntilLabel) {
+            const validUntilInput = document.getElementById('editor-valid-until');
+            const raw = validUntilInput && validUntilInput.value ? String(validUntilInput.value).trim() : '';
+            if (!isInvoice && raw) {
+                const d = raw.substring(0, 10);
+                const parts = d.split('-');
+                validUntilSpan.textContent = parts.length === 3 ? (parts[2] + '/' + parts[1] + '/' + parts[0]) : raw;
+                validUntilLabel.textContent = labels.validUntil + ' ';
+                validUntilWrap.classList.remove('hidden');
+                validUntilWrap.style.display = 'block';
+            } else {
+                validUntilWrap.classList.add('hidden');
+                validUntilWrap.style.display = 'none';
+            }
         }
         const clientH = document.querySelector('.preview-client h4');
         if (clientH) clientH.textContent = labels.para;
@@ -1359,7 +1378,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cerrar sidebar en móvil tras click
         if (window.innerWidth <= 768) {
             sidebar.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
         }
+    }
+
+    // Hamburger: abrir/cerrar sidebar en móvil
+    const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
+    const sidebarOverlay = document.querySelector('.sidebar-overlay');
+    if (btnSidebarToggle && sidebar) {
+        btnSidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            document.body.classList.toggle('sidebar-open', sidebar.classList.contains('active'));
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
+            if (sidebar) sidebar.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
+        });
     }
 
     window.ensureEditorProjectsLoaded = async function() {

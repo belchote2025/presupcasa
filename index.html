@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>PRESUNAVEGATEL - Generador de Presupuestos Premium</title>
     <meta name="description" content="Crea, edita y gestiona presupuestos profesionales de forma rápida y sencilla.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -181,6 +181,9 @@
 
         <main class="main-content">
             <header class="top-bar">
+                <button type="button" class="top-bar-menu-btn" id="btn-sidebar-toggle" aria-label="Abrir menú" title="Menú">
+                    <i data-lucide="menu"></i>
+                </button>
                 <div class="search-container">
                     <i data-lucide="search"></i>
                     <input type="text" id="global-search" placeholder="Buscar presupuestos...">
@@ -1793,6 +1796,7 @@
                                 <h2>PRESUPUESTO</h2>
                                 <p><strong>Nº:</strong> <span id="preview-quote-id">NUEVO</span></p>
                                 <p><strong>Fecha:</strong> <span id="preview-date">22/01/2024</span></p>
+                                <p class="preview-valid-until-line hidden" id="preview-valid-until-wrap" style="margin-bottom:0;"><strong id="preview-valid-until-label">Válido hasta:</strong> <span id="preview-valid-until">--/--/----</span></p>
                             </div>
                         </div>
 
