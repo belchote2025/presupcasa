@@ -1,0 +1,15 @@
+# Prueba 508 sugerida por Hostinger
+
+Si el 508 solo aparece en llamadas a la API (GET/POST a api.php), puedes confirmar que el fallo viene del script así:
+
+1. En public_html, renombra temporalmente:
+   - api.php  →  api.php.off
+
+2. Recarga la web (Ctrl+F5). La página principal (/ e /index.html) debería seguir respondiendo 200.
+
+3. La app no podrá cargar datos (las llamadas a la API fallarán). Si el 508 desaparece, el problema está en la ejecución de api.php (límites, consultas pesadas, etc.).
+
+4. Para volver a la normalidad:
+   - api.php.off  →  api.php
+
+Nota: La app llama a api.php. Si renombras api.php a api.php.off, la API deja de responder; si el 508 desaparece, el problema estaba en la ejecución de api.php.

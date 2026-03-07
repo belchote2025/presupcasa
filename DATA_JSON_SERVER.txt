@@ -1,0 +1,7 @@
+# API en producción – referencia
+
+La app usa **api.php** directamente (no data.json ni backend.php).
+
+Si en el navegador ves errores tipo "data.json" o "405", asegúrate de tener subido **app.js** actual (versión 18+), que llama a api.php. Ver **SUBE_A_PRODUCCION_APP.txt**.
+
+Opcional: en .htaccess puedes tener también la regla `RewriteRule ^data\.json$ backend.php [L,QSA]` por si en el futuro usas data.json; la app actual no lo necesita.

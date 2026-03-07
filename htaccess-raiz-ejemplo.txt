@@ -1,0 +1,19 @@
+# Alternativa: cuando la app está en SUBDIRECTORIO (ej. public_html/presup/)
+# Copia este bloque al PRINCIPIO de public_html/.htaccess
+#
+# OPCIÓN A - Excluir /presup/ de redirecciones (evita 508 al llamar a api.php)
+# Copia este bloque AL PRINCIPIO de tu public_html/.htaccess
+# Si tu carpeta NO se llama "presup", cambia /presup/ por el nombre real.
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# Excluir /presup/ para evitar 508
+RewriteCond %{REQUEST_URI} ^/presup/api\.php [OR]
+RewriteCond %{REQUEST_URI} ^/presup/
+RewriteRule ^ - [L]
+# Opcional: redirigir raíz (/) a /presup/ para que https://tudominio.com/ lleve a /presup/
+# RewriteCond %{REQUEST_URI} ^/$
+# RewriteRule ^$ /presup/ [R=301,L]
+</IfModule>
+
+# Aquí siguen el resto de reglas de tu sitio (redirecciones, etc.)

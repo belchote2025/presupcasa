@@ -1,0 +1,71 @@
+# Solución 508: instalar la app en un subdirectorio (presup)
+
+El 508 en la raíz suele venir de reglas del hosting que redirigen todo.  
+Si pones la app en una carpeta (ej. presup), esa carpeta puede quedar fuera del bucle.
+
+## 1. En Hostinger – crear la carpeta
+
+- En **Administrador de archivos** → **public_html**
+- Crear carpeta: **presup**
+
+## 2. Mover (o subir) los archivos dentro de presup
+
+Dentro de **public_html/presup/** deben estar:
+
+- index.html
+- app.js
+- sw.js
+- api.php
+- style.css
+- logo.png
+- manifest.json
+- (y el resto de archivos PHP/JS/CSS de la app)
+
+Es decir: todo lo que ahora está en la raíz de public_html, pásalo a **public_html/presup/**.
+
+## 3. .htaccess en la raíz (public_html)
+
+En **public_html/.htaccess** debe haber **al principio** una regla que deje pasar todo lo que vaya a /presup/:
+
+```apache
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# No tocar nada bajo /presup/ (evita 508 para api.php)
+RewriteCond %{REQUEST_URI} ^/presup/ [NC]
+RewriteRule ^ - [L]
+# ... el resto de tus reglas (api.php, etc.) ...
+</IfModule>
+```
+
+Así las peticiones a **presup/api.php** no entran en otras redirecciones.
+
+## 4. .htaccess dentro de presup
+
+Dentro de **public_html/presup/** crea (o deja) un archivo **.htaccess** con:
+
+```apache
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /presup/
+RewriteCond %{REQUEST_URI} \.php$ [OR]
+RewriteCond %{REQUEST_URI} api\.php
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+</IfModule>
+<FilesMatch "api\.php">
+Header set Content-Type "application/json; charset=utf-8"
+</FilesMatch>
+```
+
+## 5. Entrar siempre por la URL del subdirectorio
+
+Abre la app así:
+
+https://goldenrod-finch-839887.hostingersite.com/presup/
+
+(No uses la raíz https://goldenrod-finch-839887.hostingersite.com/ )
+
+La app ya está preparada: si está en /presup/, llamará a /presup/api.php sola.

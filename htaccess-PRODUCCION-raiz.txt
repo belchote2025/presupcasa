@@ -1,0 +1,54 @@
+# PRODUCCIÓN - App en la RAÍZ (public_html)
+# Si la app está en subcarpeta /presup/, descomenta las 2 líneas siguientes y pon el .htaccess en la raíz:
+# RewriteCond %{REQUEST_URI} ^/presup/ [NC]
+# RewriteRule ^ - [L]
+# Si sigue 508: desactivar mod_reqtimeout en el host o quitar el bloque IfModule mod_reqtimeout.
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# 0) Si usas subcarpeta /presup/, deja pasar todo lo que vaya ahí (evita 508)
+RewriteCond %{REQUEST_URI} ^/presup/ [NC]
+RewriteRule ^ - [L]
+# 1) data.json → backend.php (opcional; la app puede usar api.php directo)
+RewriteRule ^data\.json$ backend.php [L,QSA]
+# 2) backend.php y api.php en raíz: no reescribir (evita 508)
+RewriteRule ^backend\.php$ - [L]
+RewriteRule ^api\.php$ - [L]
+# 3) Cualquier otro .php: no reescribir
+RewriteCond %{THE_REQUEST} \s/[^\s]*\.php [NC]
+RewriteRule ^ - [L]
+# 4) Archivos y carpetas existentes
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+</IfModule>
+
+# Compresión gzip / brotli para mejorar tiempos de carga (si el módulo está disponible)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Caché de navegador para archivos estáticos (no aplica a api.php/backend.php)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType application/json "access plus 1 hour"
+</IfModule>
+
+# Si el 508 persiste, COMENTAR o BORRAR este bloque (algunos hosts lo interpretan mal)
+<IfModule mod_reqtimeout.c>
+RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+</IfModule>
+
+<FilesMatch "api\.php|backend\.php">
+Header set Content-Type "application/json; charset=utf-8"
+</FilesMatch>

@@ -1,12 +1,12 @@
-# PRESUNAVEGATEL - Evitar 508 Loop Detected en Hostinger
-# Asegura que api.php y los archivos PHP se ejecuten sin ser redirigidos.
+# NAVEGA360PRO - Evitar 508 Loop en Hostinger
+# Este archivo va en la MISMA carpeta que api.php (ej. public_html/presup/.htaccess)
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # Si tu app está en un subdirectorio, descomenta y ajusta (ej. /presup/):
-    # RewriteBase /presup/
+    # Si la app está en un subdirectorio (ej. /presup/), descomenta la línea siguiente:
+    RewriteBase /presup/
 
-    # NUNCA reescribir api.php ni otros .php (evita loop)
+    # NUNCA reescribir api.php ni otros .php (evita el loop 508)
     RewriteCond %{REQUEST_URI} ^/.*api\.php [OR]
     RewriteCond %{REQUEST_URI} \.php$
     RewriteRule ^ - [L]

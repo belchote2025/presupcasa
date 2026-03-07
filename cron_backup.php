@@ -121,9 +121,9 @@ if ($destEmail && $to !== '' && filter_var($to, FILTER_VALIDATE_EMAIL)) {
     $fromHeader = $fromName ? "{$fromName} <{$fromEmail}>" : $fromEmail;
     $boundary = md5(uniqid());
     $headers = "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"{$boundary}\"\r\nFrom: {$fromHeader}\r\n";
-    $msg = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . base64_encode("Copia de seguridad programada PRESUNAVEGATEL " . $now->format('d/m/Y H:i')) . "\r\n";
+    $msg = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . base64_encode("Copia de seguridad programada NAVEGA360PRO " . $now->format('d/m/Y H:i')) . "\r\n";
     $msg .= "--{$boundary}\r\nContent-Type: application/json; name=\"{$filename}\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"{$filename}\"\r\n\r\n" . base64_encode($json) . "\r\n--{$boundary}--";
-    @mail($to, "Copia de seguridad PRESUNAVEGATEL " . $now->format('d/m/Y'), $msg, $headers);
+    @mail($to, "Copia de seguridad NAVEGA360PRO " . $now->format('d/m/Y'), $msg, $headers);
 }
 
 $destWebhook = (int)($row['backup_dest_webhook'] ?? 0);

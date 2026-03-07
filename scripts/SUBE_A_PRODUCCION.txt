@@ -1,4 +1,4 @@
-# Archivos a subir a producción (PRESUNAVEGATEL – integraciones)
+# Archivos a subir a producción (NAVEGA360PRO – integraciones)
 
 Ejecutar UNA VEZ en el servidor de producción (si aún no lo has hecho):
 - add_integraciones.sql (o add_integraciones_columnas.php) para: sender_name, document_language, payment_link_url, payment_enabled, backup_email, quote_signature.

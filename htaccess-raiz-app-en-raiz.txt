@@ -1,0 +1,17 @@
+# Alternativa mínima: app en RAÍZ. Si prefieres menos reglas, usa este bloque
+# al principio de public_html/.htaccess. Si no, usa htaccess-PRODUCCION-raiz.txt completo.
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# No redirigar api.php ni otros PHP
+RewriteCond %{REQUEST_URI} ^/api\.php [OR]
+RewriteCond %{REQUEST_URI} \.php$
+RewriteRule ^ - [L]
+# No reescribir archivos ni carpetas existentes
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+</IfModule>
+
+# El resto de tus reglas (redirecciones, etc.) van después.

@@ -1,13 +1,35 @@
 {
-  "name": "PRESUNAVEGATEL - Presupuestos",
-  "short_name": "Navegatel",
-  "description": "Generador de presupuestos y facturas profesional",
+  "name": "NAVEGA360PRO - Presupuestos y Facturas",
+  "short_name": "NAVEGA360PRO",
+  "description": "NAVEGA360PRO: presupuestos, facturas y gestión 360° desde móvil o escritorio.",
+  "id": "./index.html",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#0f172a",
   "theme_color": "#d21f2b",
+  "categories": ["business", "productivity", "finance"],
   "icons": [
-    { "src": "logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
 }

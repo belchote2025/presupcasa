@@ -1,0 +1,39 @@
+# Subir app a producción (Hostinger) – evitar 405 / 508 / data.json
+
+## Qué subir
+
+En la raíz de public_html (donde está index.html) sube **estos archivos** (sobrescribir):
+
+1. **index.html** – debe contener:  
+   `<script src="app.js?v=18"></script>`
+
+2. **app.js** – el que usa **api.php** directo.  
+   Busca `getApiEndpoint`. Debe ser:  
+   `return getApiBase() + 'api.php';`  
+   Y al cargar la página en consola (F12) debe salir: **PRESUP – app.js versión: 18**
+
+3. **sw.js** – Service Worker (caché v3). Evita que el navegador use una versión antigua en caché.
+
+4. **diagnostico_produccion.php** (opcional) – Sube y abre en el navegador para comprobar que api.php responde 200 y ver el .htaccess recomendado.
+
+En la misma carpeta debe existir **api.php** (tu API).
+
+## Cómo subir
+
+- Por **Administrador de archivos** de Hostinger:  
+  public_html → Subir archivos → elegir **index.html** y **app.js** (sobrescribir los que haya).
+
+- O por **FTP**: sustituir index.html y app.js en la misma carpeta donde está la app.
+
+## Después de subir
+
+1. Abre la web en **ventana de incógnito**:  
+   https://goldenrod-finch-839887.hostingersite.com/
+
+2. F12 → pestaña **Red (Network)** → recarga (Ctrl+F5).
+
+3. Comprueba que se carga **app.js?v=18** (no v=15 ni v=16).
+
+4. Prueba a iniciar sesión.
+
+Si sigue saliendo el mensaje de "data.json" y ".htaccess", el navegador está usando una versión antigua en caché. Prueba en otro navegador o en el móvil con datos (sin WiFi) para descartar caché.

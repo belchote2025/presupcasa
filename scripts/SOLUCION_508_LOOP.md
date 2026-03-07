@@ -70,6 +70,6 @@ Si tras esto el 508 sigue apareciendo:
 
 ## Resumen rápido
 
-- Entra **siempre** por la URL donde está la app (ej. `https://tu-dominio.com/presup/`).
+- Entra **siempre** por la URL donde está la app (ej. `https://tu-dominio.com/presup/`). La app ya usa esa ruta para llamar a `api.php`, así que si entras por la URL correcta se evita el 508.
 - Usa el `.htaccess` que viene con el proyecto en la **misma carpeta** que `api.php`.
-- En el `.htaccess` de la **raíz**, excluye `api.php` (y la carpeta de la app) de cualquier redirección que envíe todo a una sola página.
+- En el `.htaccess` de la **raíz** (`public_html`), pon al principio las reglas de `htaccess-raiz-ejemplo.txt` para excluir la carpeta de la app y `api.php` de redirecciones.

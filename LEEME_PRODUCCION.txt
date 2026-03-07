@@ -1,0 +1,9 @@
+# Producción – guía rápida
+
+1. **Subir la app** → Ver **SUBE_A_PRODUCCION_APP.txt** (index.html, app.js, sw.js, api.php en public_html).
+
+2. **.htaccess en la raíz** → Copiar contenido de **htaccess-PRODUCCION-raiz.txt** a public_html/.htaccess.
+
+3. **Comprobar que api.php responde** → Subir **diagnostico_produccion.php** y abrirlo en el navegador; debe salir HTTP 200.
+
+4. **Si aparece 508 o la app en subcarpeta** → Ver **INSTALAR_EN_SUBDIRECTORIO.txt** y **PRUEBA_508_HOSTINGER.txt**.
