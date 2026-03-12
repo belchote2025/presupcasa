@@ -2,7 +2,9 @@
 
 // --- Versión del script (actualiza al subir; en producción debe verse v18+, endpoint api.php) ---
 const APP_JS_VERSION = '18';
-console.log('PRESUP – app.js versión:', APP_JS_VERSION);
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    console.log('PRESUP – app.js versión:', APP_JS_VERSION);
+}
 
 // Reducir aviso Canvas2D por getImageData (html2canvas): optimización para lecturas frecuentes
 (function () {
@@ -4430,8 +4432,29 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         document.getElementById(id)?.addEventListener('input', () => updateContractPreview());
         document.getElementById(id)?.addEventListener('change', () => updateContractPreview());
     });
-    document.getElementById('btn-contract-download-pdf')?.addEventListener('click', async () => {
+    async function getContractPDFBlob() {
         updateContractPreview();
+        const el = document.getElementById('contract-preview');
+        if (!el || typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+            throw new Error('Cargando librerías PDF...');
+        }
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+        const img = canvas.toDataURL('image/png');
+        const PdfCtor = window.jspdf && (window.jspdf.jsPDF || window.jspdf.js);
+        if (!PdfCtor) throw new Error('No se pudo inicializar la librería PDF.');
+        const pdf = new PdfCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const w = pdf.internal.pageSize.getWidth();
+        const h = (canvas.height * w) / canvas.width;
+        pdf.addImage(img, 'PNG', 0, 0, w, Math.min(h, 297));
+        if (h > 297) {
+            pdf.addPage();
+            pdf.addImage(img, 'PNG', 0, -(297 * canvas.width / canvas.height), w, h);
+        }
+        return pdf.output('blob');
+    }
+    window.getContractPDFBlob = getContractPDFBlob;
+
+    document.getElementById('btn-contract-download-pdf')?.addEventListener('click', async () => {
         const el = document.getElementById('contract-preview');
         if (!el || typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
             showToast('Cargando librerías PDF...', 'info');
@@ -4439,27 +4462,51 @@ Este marco tendrá la vigencia indicada en el encabezado y se prorrogará tácit
         }
         showToast('Generando PDF...', 'info');
         try {
-            const canvas = await html2canvas(el, { scale: 2, useCORS: true });
-            const img = canvas.toDataURL('image/png');
-            const PdfCtor = window.jspdf && (window.jspdf.jsPDF || window.jspdf.js);
-            if (!PdfCtor) {
-                showToast('No se pudo inicializar la librería PDF.', 'error');
-                return;
-            }
-            const pdf = new PdfCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            const w = pdf.internal.pageSize.getWidth();
-            const h = (canvas.height * w) / canvas.width;
-            pdf.addImage(img, 'PNG', 0, 0, w, Math.min(h, 297));
-            if (h > 297) {
-                pdf.addPage();
-                pdf.addImage(img, 'PNG', 0, -(297 * canvas.width / canvas.height), w, h);
-            }
+            const blob = await getContractPDFBlob();
             const id = document.getElementById('contract-id')?.value || 'contrato';
-            pdf.save('Contrato_' + id + '.pdf');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Contrato_' + id + '.pdf';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
             showToast('PDF descargado', 'success');
         } catch (e) {
-            showToast('Error al generar PDF', 'error');
+            showToast(e.message || 'Error al generar PDF', 'error');
         }
+    });
+    document.getElementById('btn-contract-send-email')?.addEventListener('click', () => {
+        const previewCard = document.getElementById('contract-preview-card');
+        if (previewCard) previewCard.classList.remove('hidden');
+        updateContractPreview();
+        const contractId = document.getElementById('contract-id')?.value || 'contrato';
+        const contractTitle = (document.getElementById('contract-title')?.value || 'Contrato').trim();
+        const contractClientEmail = (document.getElementById('contract-client-email')?.value || '').trim();
+        window._emailContext = {
+            getPDFBlob: getContractPDFBlob,
+            filename: 'Contrato_' + contractId + '.pdf'
+        };
+        const modalEmailOverlay = document.getElementById('modal-email-overlay');
+        const modalEmailTo = document.getElementById('modal-email-to');
+        const modalEmailSubject = document.getElementById('modal-email-subject');
+        const modalEmailBody = document.getElementById('modal-email-body');
+        const nombreArchivoContract = 'Contrato_' + contractId + '.pdf';
+        const defaultBodyContract = `Buenos días,
+
+Le enviamos el contrato en el archivo adjunto (${nombreArchivoContract}).
+
+Puede revisarlo y, si tiene alguna duda, no dude en contactarnos.
+
+Un cordial saludo.`;
+        if (modalEmailTo) modalEmailTo.value = contractClientEmail;
+        if (modalEmailSubject) modalEmailSubject.value = 'Contrato: ' + contractTitle;
+        if (modalEmailBody) modalEmailBody.value = defaultBodyContract;
+        if (modalEmailOverlay) modalEmailOverlay.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+        setTimeout(function () { if (modalEmailTo) modalEmailTo.focus(); }, 100);
     });
     document.getElementById('btn-contract-print')?.addEventListener('click', () => {
         try {
@@ -6642,7 +6689,9 @@ window.addEventListener('load', function() {
     const statusSelector = document.getElementById('quote-status');
     if (statusSelector) {
         statusSelector.addEventListener('change', async (e) => {
-            console.log('Estado cambiado a:', e.target.value, 'Quote ID:', currentQuoteId);
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('Estado cambiado a:', e.target.value, 'Quote ID:', currentQuoteId);
+            }
             if (e.target.value === 'accepted' && currentQuoteId && !currentQuoteId.startsWith('FAC-')) {
                 if (confirm('¿Deseas generar una factura electrónica a partir de este presupuesto?')) {
                     await generateInvoiceFromQuote();
@@ -6808,13 +6857,26 @@ window.addEventListener('load', function() {
                 return false;
             }
         });
-        const imgData = canvas.toDataURL('image/jpeg', 0.78);
+        const imgData = canvas.toDataURL('image/jpeg', 0.6);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         return pdf.output('blob');
+    }
+
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result;
+                const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+                resolve(base64);
+            };
+            reader.onerror = () => reject(new Error('Error al convertir PDF a base64'));
+            reader.readAsDataURL(blob);
+        });
     }
 
     downloadBtn.addEventListener('click', downloadPDF);
@@ -6824,15 +6886,27 @@ window.addEventListener('load', function() {
     const modalEmailTo = document.getElementById('modal-email-to');
     const modalEmailSubject = document.getElementById('modal-email-subject');
     const modalEmailBody = document.getElementById('modal-email-body');
+    window._emailContext = null;
+    const DEFAULT_EMAIL_BODY = `Buenos días,
+
+Le enviamos el {{tipo}} {{id}} en el archivo adjunto ({{nombre_archivo}}).
+
+Puede revisarlo y, si tiene alguna duda o desea realizar cualquier cambio, no dude en contactarnos.
+
+Un cordial saludo.`;
+    const DEFAULT_EMAIL_SUBJECT = '{{tipo}} {{id}}';
+
     document.getElementById('btn-send-email').addEventListener('click', () => {
+        window._emailContext = null;
         modalEmailTo.value = clientEmailInput.value.trim() || '';
         const tipo = (currentQuoteId && currentQuoteId.startsWith('FAC-')) ? 'Factura' : 'Presupuesto';
         const id = currentQuoteId || '';
+        const nombreArchivo = (tipo === 'Factura' ? 'Factura' : 'Presupuesto') + '_' + (id || 'nuevo') + '.pdf';
         const settings = getCachedData('settings') || {};
-        const subjectTemplate = (settings.document_email_subject || '').trim() || (tipo + ' ' + id);
-        const bodyTemplate = (settings.document_email_body || '').trim() || 'Adjunto encontrará el documento. Si tiene alguna duda, no dude en contactarnos.';
-        modalEmailSubject.value = subjectTemplate.replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{id\}\}/g, id);
-        modalEmailBody.value = bodyTemplate.replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{id\}\}/g, id);
+        const subjectTemplate = (settings.document_email_subject || '').trim() || DEFAULT_EMAIL_SUBJECT;
+        const bodyTemplate = (settings.document_email_body || '').trim() || DEFAULT_EMAIL_BODY;
+        modalEmailSubject.value = subjectTemplate.replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{id\}\}/g, id).replace(/\{\{nombre_archivo\}\}/g, nombreArchivo);
+        modalEmailBody.value = bodyTemplate.replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{id\}\}/g, id).replace(/\{\{nombre_archivo\}\}/g, nombreArchivo);
         modalEmailOverlay.classList.remove('hidden');
         if (window.lucide) lucide.createIcons();
         setTimeout(function () { if (modalEmailTo) modalEmailTo.focus(); }, 100);
@@ -6842,40 +6916,109 @@ window.addEventListener('load', function() {
         if (e.target === modalEmailOverlay) modalEmailOverlay.classList.add('hidden');
     });
     document.addEventListener('keydown', function emailModalEscape(e) {
-        if (e.key === 'Escape' && modalEmailOverlay && !modalEmailOverlay.classList.contains('hidden')) {
+        console.log('[Email] Clic en Enviar (servidor)');
+    }
+    const to = modalEmailTo.value.trim();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        showToast('Indica un email de destino válido', 'error');
+        return;
+    }
+    if (modalEmailSendBtn.disabled) return;
+    modalEmailSendBtn.disabled = true;
+    const isInvoice = currentDocumentIsInvoice || (currentQuoteId && String(currentQuoteId).startsWith('FAC-'));
+    const ctx = window._emailContext;
+    const filename = ctx && ctx.filename
+        ? ctx.filename
+        : ((isInvoice ? 'Factura' : 'Presupuesto') + '_' + (currentQuoteId || 'nuevo') + '.pdf');
+    const getBlob = ctx && ctx.getPDFBlob
+        ? ctx.getPDFBlob
+        : getPDFBlob;
+    const showResult = (result) => {
+        if (result && result.status === 'success') {
             modalEmailOverlay.classList.add('hidden');
+            showToast('Email enviado correctamente con el PDF adjunto', 'success');
+        } else {
+            let msg = result?.message || 'No se pudo enviar el email';
+            if (result?.smtp_status) {
+                const s = result.smtp_status;
+                if (!s.smtp_enabled) msg += ' (En servidor: SMTP desactivado. Actívalo y Guardar configuración.)';
+                else if (!s.has_user) msg += ' (En servidor: falta Usuario SMTP. Rellena y Guardar.)';
+                else if (!s.has_pass) msg += ' (En servidor: falta Contraseña. Pon la contraseña de aplicación y Guardar.)';
+            }
+            console.error('[Email] Error del servidor:', msg);
+            if (/rechazado|rechazó/i.test(msg)) {
+                showToast('Gmail rechazó el envío. Usa «Abrir mi correo»: se descargará el PDF y se abrirá tu correo para que lo envíes tú. (Detalle en consola F12)', 'error');
+            } else {
+                showToast(msg, 'error');
+            }
         }
-    });
-    const modalEmailSendBtn = document.getElementById('modal-email-send');
-    modalEmailSendBtn.addEventListener('click', async () => {
-        const to = modalEmailTo.value.trim();
-        if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-            showToast('Indica un email de destino válido', 'error');
+    };
+    let blob;
+    try {
+        showToast('Generando PDF...', 'info');
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('[Email] Generando PDF...');
+        }
+        blob = await getBlob();
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('[Email] PDF listo, tamaño:', blob.size, 'bytes');
+        }
+        showToast('Subiendo PDF...', 'info');
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('[Email] Subiendo adjunto...');
+        }
+        const fdUpload = new FormData();
+        fdUpload.append('pdf', blob, filename);
+        const uploadRes = await apiFetch('upload_email_attachment', { method: 'POST', body: fdUpload, timeout: 90000 });
+        if (!uploadRes || uploadRes.status !== 'success' || !uploadRes.token) {
+            console.error('[Email] Subida fallida:', uploadRes?.message);
+            showToast(uploadRes?.message || 'No se pudo subir el adjunto', 'error');
             return;
         }
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('[Email] Adjunto subido, enviando correo... (puede tardar hasta 2 min)');
+        }
+        showToast('Enviando correo por SMTP... (puede tardar 1-2 min)', 'info');
+        const fd = new FormData();
+        fd.append('to', to);
+        fd.append('subject', modalEmailSubject.value);
+        fd.append('body', modalEmailBody.value);
+        fd.append('pdf_token', uploadRes.token);
+        fd.append('pdf_filename', filename);
+        const result = await apiFetch('send_email', { method: 'POST', body: fd, timeout: 120000 });
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('[Email] Respuesta:', result?.status, result?.message || '');
+        }
+        showResult(result);
+    } catch (e) {
+        console.error('[Email] Error:', e.message || e);
+        const msg = e.message || 'Error al enviar el email';
+        const noResponde = /no responde|timeout|tardó demasiado|respuesta vacía/i.test(String(msg));
+        showToast(noResponde ? 'El servidor no responde. Usa «Abrir mi correo» para descargar el PDF y enviarlo desde tu correo.' : msg, 'error');
+    } finally {
+        modalEmailSendBtn.disabled = false;
+    }
+});
+
+document.getElementById('modal-email-open-mailto').addEventListener('click', async () => {
+    const to = modalEmailTo.value.trim();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        showToast('Indica un email de destino válido', 'error');
+        return;
+    }
+    try {
+        showToast('Generando PDF...', 'info');
         if (modalEmailSendBtn.disabled) return;
         modalEmailSendBtn.disabled = true;
-        try {
-            showToast('Generando PDF...', 'info');
-            const blob = await getPDFBlob();
-            const isInvoice = currentDocumentIsInvoice || (currentQuoteId && String(currentQuoteId).startsWith('FAC-'));
-            const filename = (isInvoice ? 'Factura' : 'Presupuesto') + '_' + (currentQuoteId || 'nuevo') + '.pdf';
-            showToast('Subiendo adjunto...', 'info');
-            const fdUpload = new FormData();
-            fdUpload.append('pdf', blob, filename);
-            const uploadRes = await apiFetch('upload_email_attachment', { method: 'POST', body: fdUpload, timeout: 120000 });
-            if (!uploadRes || uploadRes.status !== 'success' || !uploadRes.token) {
-                showToast(uploadRes?.message || 'No se pudo subir el adjunto', 'error');
-                return;
-            }
-            showToast('Enviando correo con adjunto...', 'info');
-            const fd = new FormData();
-            fd.append('to', to);
-            fd.append('subject', modalEmailSubject.value);
-            fd.append('body', modalEmailBody.value);
-            fd.append('pdf_token', uploadRes.token);
-            fd.append('pdf_filename', filename);
-            const result = await apiFetch('send_email', { method: 'POST', body: fd, timeout: 120000 });
+        const isInvoice = currentDocumentIsInvoice || (currentQuoteId && String(currentQuoteId).startsWith('FAC-'));
+        const ctx = window._emailContext;
+        const filename = ctx && ctx.filename
+            ? ctx.filename
+            : ((isInvoice ? 'Factura' : 'Presupuesto') + '_' + (currentQuoteId || 'nuevo') + '.pdf');
+        const getBlob = ctx && ctx.getPDFBlob
+            ? ctx.getPDFBlob
+            : getPDFBlob;
+        const showResult = (result) => {
             if (result && result.status === 'success') {
                 modalEmailOverlay.classList.add('hidden');
                 showToast('Email enviado correctamente con el PDF adjunto', 'success');
@@ -6887,13 +7030,56 @@ window.addEventListener('load', function() {
                     else if (!s.has_user) msg += ' (En servidor: falta Usuario SMTP. Rellena y Guardar.)';
                     else if (!s.has_pass) msg += ' (En servidor: falta Contraseña. Pon la contraseña de aplicación y Guardar.)';
                 }
-                showToast(msg, 'error');
+                console.error('[Email] Error del servidor:', msg);
+                if (/rechazado|rechazó/i.test(msg)) {
+                    showToast('Gmail rechazó el envío. Usa «Abrir mi correo»: se descargará el PDF y se abrirá tu correo para que lo envíes tú. (Detalle en consola F12)', 'error');
+                } else {
+                    showToast(msg, 'error');
+                }
             }
+        };
+        let blob;
+        try {
+            showToast('Generando PDF...', 'info');
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('[Email] Generando PDF...');
+            }
+            blob = await getBlob();
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('[Email] PDF listo, tamaño:', blob.size, 'bytes');
+            }
+            showToast('Subiendo PDF...', 'info');
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('[Email] Subiendo adjunto...');
+            }
+            const fdUpload = new FormData();
+            fdUpload.append('pdf', blob, filename);
+            const uploadRes = await apiFetch('upload_email_attachment', { method: 'POST', body: fdUpload, timeout: 90000 });
+            if (!uploadRes || uploadRes.status !== 'success' || !uploadRes.token) {
+                console.error('[Email] Subida fallida:', uploadRes?.message);
+                showToast(uploadRes?.message || 'No se pudo subir el adjunto', 'error');
+                return;
+            }
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('[Email] Adjunto subido, enviando correo... (puede tardar hasta 2 min)');
+            }
+            showToast('Enviando correo por SMTP... (puede tardar 1-2 min)', 'info');
+            const fd = new FormData();
+            fd.append('to', to);
+            fd.append('subject', modalEmailSubject.value);
+            fd.append('body', modalEmailBody.value);
+            fd.append('pdf_token', uploadRes.token);
+            fd.append('pdf_filename', filename);
+            const result = await apiFetch('send_email', { method: 'POST', body: fd, timeout: 120000 });
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('[Email] Respuesta:', result?.status, result?.message || '');
+            }
+            showResult(result);
         } catch (e) {
-            console.error('Error enviando email:', e);
+            console.error('[Email] Error:', e.message || e);
             const msg = e.message || 'Error al enviar el email';
-            const isTimeoutOrEmpty = /timeout|tardó demasiado|respuesta vacía/i.test(String(msg));
-            showToast(isTimeoutOrEmpty ? 'El servidor tardó demasiado. Usa «Abrir mi correo»: se descargará el PDF y se abrirá tu programa de correo para que lo adjuntes.' : msg, 'error');
+            const noResponde = /no responde|timeout|tardó demasiado|respuesta vacía/i.test(String(msg));
+            showToast(noResponde ? 'El servidor no responde. Usa «Abrir mi correo» para descargar el PDF y enviarlo desde tu correo.' : msg, 'error');
         } finally {
             modalEmailSendBtn.disabled = false;
         }
@@ -6907,9 +7093,12 @@ window.addEventListener('load', function() {
         }
         try {
             showToast('Generando PDF...', 'info');
-            const blob = await getPDFBlob();
-            const isInvoice = currentDocumentIsInvoice || (currentQuoteId && String(currentQuoteId).startsWith('FAC-'));
-            const filename = (isInvoice ? 'Factura' : 'Presupuesto') + '_' + (currentQuoteId || 'nuevo') + '.pdf';
+            const ctx = window._emailContext;
+            const getBlob = ctx && ctx.getPDFBlob ? ctx.getPDFBlob : getPDFBlob;
+            const blob = await getBlob();
+            const filename = ctx && ctx.filename
+                ? ctx.filename
+                : ((currentDocumentIsInvoice || (currentQuoteId && String(currentQuoteId).startsWith('FAC-'))) ? 'Factura' : 'Presupuesto') + '_' + (currentQuoteId || 'nuevo') + '.pdf';
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -8406,6 +8595,13 @@ window.addEventListener('load', function() {
                 if (remindersEl) remindersEl.checked = (settings.appointment_reminders_enabled !== 0 && settings.appointment_reminders_enabled !== '0');
                 const overdueDaysEl = document.getElementById('settings-overdue-invoice-days');
                 if (overdueDaysEl) overdueDaysEl.value = Math.max(1, Math.min(365, parseInt(settings.overdue_invoice_days, 10) || 30));
+                const emailProviderEl = document.getElementById('settings-email-provider');
+                const emailApiKeyEl = document.getElementById('settings-email-api-key');
+                const emailMailgunDomainEl = document.getElementById('settings-email-mailgun-domain');
+                if (emailProviderEl) emailProviderEl.value = (settings.email_provider || 'smtp').toLowerCase();
+                if (emailApiKeyEl) emailApiKeyEl.value = settings.email_api_key || '';
+                if (emailMailgunDomainEl) emailMailgunDomainEl.value = settings.email_mailgun_domain || '';
+                updateEmailMethodVisibility();
                 const smtpEnabledEl = document.getElementById('settings-smtp-enabled');
                 if (smtpEnabledEl) smtpEnabledEl.checked = !!(settings.smtp_enabled * 1);
                 const smtpHostEl = document.getElementById('settings-smtp-host');
@@ -8413,7 +8609,7 @@ window.addEventListener('load', function() {
                 const smtpPortEl = document.getElementById('settings-smtp-port');
                 if (smtpPortEl) smtpPortEl.value = (settings.smtp_port != null && settings.smtp_port !== '') ? settings.smtp_port : '587';
                 const smtpUserEl = document.getElementById('settings-smtp-user');
-                if (smtpUserEl) smtpUserEl.value = settings.smtp_user || 'belchote2025@gmail.com';
+                if (smtpUserEl) smtpUserEl.value = settings.smtp_user || '';
                 const smtpSecureEl = document.getElementById('settings-smtp-secure');
                 if (smtpSecureEl) smtpSecureEl.value = (settings.smtp_secure || 'tls');
                 const smtpProviderEl = document.getElementById('settings-smtp-provider');
@@ -8509,6 +8705,21 @@ window.addEventListener('load', function() {
             }
         } catch (e) { showToast(e.message || 'Error al crear empresa', 'error'); }
     });
+
+    function updateEmailMethodVisibility() {
+        const providerEl = document.getElementById('settings-email-provider');
+        const smtpBlock = document.getElementById('settings-smtp-block');
+        const apiBlock = document.getElementById('settings-api-email-block');
+        const mailgunWrap = document.getElementById('settings-mailgun-domain-wrap');
+        const resendHint = document.getElementById('settings-resend-hint');
+        const method = (providerEl && providerEl.value) ? providerEl.value.toLowerCase() : 'smtp';
+        if (smtpBlock) smtpBlock.classList.toggle('hidden', method !== 'smtp');
+        if (apiBlock) apiBlock.classList.toggle('hidden', method === 'smtp');
+        if (mailgunWrap) mailgunWrap.style.display = method === 'mailgun' ? '' : 'none';
+        if (resendHint) resendHint.classList.toggle('hidden', method !== 'resend');
+    }
+
+    document.getElementById('settings-email-provider')?.addEventListener('change', updateEmailMethodVisibility);
 
     function updateBackupScheduleVisibility() {
         const sched = document.getElementById('settings-backup-schedule');
@@ -8667,6 +8878,12 @@ window.addEventListener('load', function() {
         if (smtpPassEl) fd.append('smtp_pass', smtpPassEl.value);
         const smtpSecureEl = document.getElementById('settings-smtp-secure');
         if (smtpSecureEl) fd.append('smtp_secure', smtpSecureEl.value || 'tls');
+        const emailProviderEl = document.getElementById('settings-email-provider');
+        if (emailProviderEl) fd.append('email_provider', (emailProviderEl.value || 'smtp').toLowerCase());
+        const emailApiKeyEl = document.getElementById('settings-email-api-key');
+        if (emailApiKeyEl) fd.append('email_api_key', emailApiKeyEl.value.trim());
+        const emailMailgunDomainEl = document.getElementById('settings-email-mailgun-domain');
+        if (emailMailgunDomainEl) fd.append('email_mailgun_domain', emailMailgunDomainEl.value.trim());
 
         const pwaInstallEnabledEl = document.getElementById('settings-pwa-install-enabled');
         if (pwaInstallEnabledEl) fd.append('pwa_install_enabled', pwaInstallEnabledEl.checked ? '1' : '0');
@@ -8674,7 +8891,7 @@ window.addEventListener('load', function() {
         if (chatbotEnabledEl) fd.append('chatbot_enabled', chatbotEnabledEl.checked ? '1' : '0');
         try {
             await apiFetch('save_settings', { method: 'POST', body: fd });
-            // Guardar SMTP de forma explícita para asegurar que se persista (por si save_settings falla en ese bloque)
+            // Guardar envío de correo (SMTP + proveedor API) de forma explícita
             const smtpFd = new FormData();
             if (smtpEnabledEl) smtpFd.append('smtp_enabled', smtpEnabledEl.checked ? '1' : '0');
             if (smtpHostEl) smtpFd.append('smtp_host', smtpHostEl.value.trim());
@@ -8682,6 +8899,12 @@ window.addEventListener('load', function() {
             if (smtpUserEl) smtpFd.append('smtp_user', smtpUserEl.value.trim());
             if (smtpPassEl) smtpFd.append('smtp_pass', smtpPassEl.value);
             if (smtpSecureEl) smtpFd.append('smtp_secure', smtpSecureEl.value || 'tls');
+            const emailProviderFormEl = document.getElementById('settings-email-provider');
+            if (emailProviderFormEl) smtpFd.append('email_provider', (emailProviderFormEl.value || 'smtp').toLowerCase());
+            const emailApiKeyFormEl = document.getElementById('settings-email-api-key');
+            if (emailApiKeyFormEl) smtpFd.append('email_api_key', emailApiKeyFormEl.value.trim());
+            const emailMailgunDomainFormEl = document.getElementById('settings-email-mailgun-domain');
+            if (emailMailgunDomainFormEl) smtpFd.append('email_mailgun_domain', emailMailgunDomainFormEl.value.trim());
             try {
                 await apiFetch('save_smtp_only', { method: 'POST', body: smtpFd });
             } catch (e) { /* ignorar si falla, ya guardamos con save_settings */ }
@@ -8721,6 +8944,99 @@ window.addEventListener('load', function() {
             const navPwaInstall = document.getElementById('nav-pwa-install');
             if (navPwaInstall) navPwaInstall.classList.toggle('hidden', saved.pwa_install_enabled === 0 || saved.pwa_install_enabled === '0');
         } catch (e) { showToast(e.message || 'Error al guardar configuración', 'error'); }
+    });
+
+    document.getElementById('btn-test-smtp')?.addEventListener('click', async function () {
+        const smtpHostEl = document.getElementById('settings-smtp-host');
+        const smtpPortEl = document.getElementById('settings-smtp-port');
+        const smtpUserEl = document.getElementById('settings-smtp-user');
+        const smtpPassEl = document.getElementById('settings-smtp-pass');
+        const smtpSecureEl = document.getElementById('settings-smtp-secure');
+        const smtpEnabledEl = document.getElementById('settings-smtp-enabled');
+        const to = smtpUserEl?.value?.trim() || '';
+        if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+            showToast('Rellena el usuario (email) SMTP para enviar la prueba a ese correo.', 'error');
+            return;
+        }
+        const btn = this;
+        btn.disabled = true;
+        try {
+            const smtpFd = new FormData();
+            if (smtpEnabledEl) smtpFd.append('smtp_enabled', smtpEnabledEl.checked ? '1' : '0');
+            if (smtpHostEl) smtpFd.append('smtp_host', smtpHostEl.value.trim());
+            if (smtpPortEl) smtpFd.append('smtp_port', smtpPortEl.value || '587');
+            if (smtpUserEl) smtpFd.append('smtp_user', smtpUserEl.value.trim());
+            if (smtpPassEl) smtpFd.append('smtp_pass', smtpPassEl.value);
+            if (smtpSecureEl) smtpFd.append('smtp_secure', smtpSecureEl.value || 'tls');
+            const emailProviderTestEl = document.getElementById('settings-email-provider');
+            if (emailProviderTestEl) smtpFd.append('email_provider', (emailProviderTestEl.value || 'smtp').toLowerCase());
+            const emailApiKeyTestEl = document.getElementById('settings-email-api-key');
+            if (emailApiKeyTestEl) smtpFd.append('email_api_key', emailApiKeyTestEl.value.trim());
+            const emailMailgunDomainTestEl = document.getElementById('settings-email-mailgun-domain');
+            if (emailMailgunDomainTestEl) smtpFd.append('email_mailgun_domain', emailMailgunDomainTestEl.value.trim());
+            await apiFetch('save_smtp_only', { method: 'POST', body: smtpFd });
+            showToast('Enviando correo de prueba...', 'info');
+            const testFd = new FormData();
+            testFd.append('to', to);
+            const res = await apiFetch('test_smtp', { method: 'POST', body: testFd, timeout: 60000 });
+            if (res && res.status === 'success') {
+                showToast(res.message || 'Correo de prueba enviado. Revisa la bandeja (y spam).', 'success');
+            } else {
+                showToast(res?.message || 'No se pudo enviar.', 'error');
+            }
+        } catch (e) {
+            showToast(e.message || 'Error al probar el correo', 'error');
+        } finally {
+            btn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+        }
+    });
+
+    document.getElementById('btn-test-smtp-api')?.addEventListener('click', async function () {
+        const toEl = document.getElementById('settings-api-test-email');
+        const to = toEl?.value?.trim() || '';
+        if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+            showToast('Indica un email de destino para la prueba.', 'error');
+            return;
+        }
+        const btn = this;
+        btn.disabled = true;
+        try {
+            const smtpFd = new FormData();
+            const smtpEnabledEl = document.getElementById('settings-smtp-enabled');
+            const smtpHostEl = document.getElementById('settings-smtp-host');
+            const smtpPortEl = document.getElementById('settings-smtp-port');
+            const smtpUserEl = document.getElementById('settings-smtp-user');
+            const smtpPassEl = document.getElementById('settings-smtp-pass');
+            const smtpSecureEl = document.getElementById('settings-smtp-secure');
+            if (smtpEnabledEl) smtpFd.append('smtp_enabled', smtpEnabledEl.checked ? '1' : '0');
+            if (smtpHostEl) smtpFd.append('smtp_host', smtpHostEl.value.trim());
+            if (smtpPortEl) smtpFd.append('smtp_port', smtpPortEl.value || '587');
+            if (smtpUserEl) smtpFd.append('smtp_user', smtpUserEl.value.trim());
+            if (smtpPassEl) smtpFd.append('smtp_pass', smtpPassEl.value);
+            if (smtpSecureEl) smtpFd.append('smtp_secure', smtpSecureEl.value || 'tls');
+            const emailProviderEl = document.getElementById('settings-email-provider');
+            if (emailProviderEl) smtpFd.append('email_provider', (emailProviderEl.value || 'smtp').toLowerCase());
+            const emailApiKeyEl = document.getElementById('settings-email-api-key');
+            if (emailApiKeyEl) smtpFd.append('email_api_key', emailApiKeyEl.value.trim());
+            const emailMailgunDomainEl = document.getElementById('settings-email-mailgun-domain');
+            if (emailMailgunDomainEl) smtpFd.append('email_mailgun_domain', emailMailgunDomainEl.value.trim());
+            await apiFetch('save_smtp_only', { method: 'POST', body: smtpFd });
+            showToast('Enviando correo de prueba...', 'info');
+            const testFd = new FormData();
+            testFd.append('to', to);
+            const res = await apiFetch('test_smtp', { method: 'POST', body: testFd, timeout: 60000 });
+            if (res && res.status === 'success') {
+                showToast(res.message || 'Correo de prueba enviado. Revisa la bandeja (y spam).', 'success');
+            } else {
+                showToast(res?.message || 'No se pudo enviar.', 'error');
+            }
+        } catch (e) {
+            showToast(e.message || 'Error al probar el correo', 'error');
+        } finally {
+            btn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+        }
     });
 
     // Subida / borrado de certificado digital

@@ -1224,6 +1224,9 @@
                                 <button type="button" class="btn btn-secondary btn-sm" id="btn-contract-download-pdf" title="Descargar PDF">
                                     <i data-lucide="download" style="width: 14px; height: 14px;"></i> PDF
                                 </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-contract-send-email" title="Enviar por correo">
+                                    <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar por correo
+                                </button>
                                 <button type="button" class="btn btn-remove btn-sm" id="btn-contract-delete" title="Eliminar contrato">
                                     <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Eliminar
                                 </button>
@@ -2221,9 +2224,38 @@
 
                                 <hr style="border-color: var(--border); margin: 1.5rem 0;">
                                 <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-muted);">
-                                    <i data-lucide="mail"></i> Envío de correos al cliente (SMTP)
+                                    <i data-lucide="mail"></i> Envío de correos al cliente
                                 </h3>
-                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Para que los presupuestos y facturas enviados por email lleguen al cliente. Elige tu proveedor o configura uno personalizado.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Para que los presupuestos y facturas enviados por email lleguen al cliente. Puedes usar SMTP o un proveedor por API (Resend, SendGrid, Mailgun).</p>
+                                <div class="input-group">
+                                    <label>Método de envío</label>
+                                    <select id="settings-email-provider" class="status-select" style="width:100%;">
+                                        <option value="smtp">SMTP (servidor propio / Gmail / Hostinger)</option>
+                                        <option value="resend">Resend (API)</option>
+                                        <option value="sendgrid">SendGrid (API)</option>
+                                        <option value="mailgun">Mailgun (API)</option>
+                                    </select>
+                                </div>
+                                <div id="settings-api-email-block" class="hidden" style="margin-bottom: 1rem;">
+                                    <div class="input-group">
+                                        <label>API Key</label>
+                                        <input type="password" id="settings-email-api-key" placeholder="Pega aquí la API key del proveedor" autocomplete="new-password">
+                                        <small style="display:block;margin-top:0.25rem;color:var(--text-muted);font-size:0.8rem;">Resend: re_xxx · SendGrid: SG.xxx · Mailgun: key-xxx</small>
+                                        <small id="settings-resend-hint" class="hidden" style="display:block;margin-top:0.35rem;color:var(--accent);font-size:0.8rem;">Si Resend rechaza el envío: verifica tu dominio en resend.com/domains o pon como <strong>Email de la empresa</strong> (arriba): <code>onboarding@resend.dev</code> para pruebas.</small>
+                                    </div>
+                                    <div class="input-group" id="settings-mailgun-domain-wrap" style="display:none;">
+                                        <label>Dominio Mailgun</label>
+                                        <input type="text" id="settings-email-mailgun-domain" placeholder="mg.tudominio.com">
+                                    </div>
+                                    <div class="input-group" style="margin-top: 1rem;">
+                                        <label>Probar envío a</label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="email" id="settings-api-test-email" placeholder="email@ejemplo.com" class="status-select" style="flex:1; min-width: 180px;">
+                                            <button type="button" id="btn-test-smtp-api" class="btn btn-secondary">Enviar prueba</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="settings-smtp-block">
                                 <div class="input-group">
                                     <label><input type="checkbox" id="settings-smtp-enabled"> Usar SMTP para enviar correos</label>
                                 </div>
@@ -2267,6 +2299,13 @@
                                         <option value="ssl">SSL (puerto 465)</option>
                                         <option value="">Ninguna (puerto 25)</option>
                                     </select>
+                                </div>
+                                <div class="input-group" style="margin-top: 1rem;">
+                                    <button type="button" id="btn-test-smtp" class="btn btn-secondary">
+                                        <i data-lucide="send" style="width:14px;height:14px;vertical-align:middle;"></i> Probar envío de correo
+                                    </button>
+                                    <small style="display:block;margin-top:0.5rem;color:var(--text-muted);font-size:0.8rem;">Envía un correo de prueba al email del usuario SMTP. Guarda antes si acabas de cambiar algo.</small>
+                                </div>
                                 </div>
 
                                 <hr style="border-color: var(--border); margin: 1.5rem 0;">
@@ -2424,14 +2463,14 @@
                                     </select>
                                 </div>
                                 <h4 style="margin: 1rem 0 0.5rem; font-size: 0.95rem;">Plantilla para «Enviar por email»</h4>
-                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Usa <code>{{tipo}}</code> (Presupuesto/Factura) y <code>{{id}}</code> (número del documento). Si está vacío se usan valores por defecto.</p>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Usa <code>{{tipo}}</code> (Presupuesto/Factura), <code>{{id}}</code> (número) y <code>{{nombre_archivo}}</code> (ej. Presupuesto_1.pdf). Si está vacío se usa un mensaje profesional por defecto.</p>
                                 <div class="input-group">
                                     <label>Asunto por defecto</label>
-                                    <input type="text" id="settings-document-email-subject" placeholder="Ej: {{tipo}} {{id}} - Mi Empresa">
+                                    <input type="text" id="settings-document-email-subject" placeholder="Ej: {{tipo}} {{id}}">
                                 </div>
                                 <div class="input-group">
                                     <label>Mensaje por defecto</label>
-                                    <textarea id="settings-document-email-body" rows="3" placeholder="Adjunto encontrará el {{tipo}} {{id}}. Si tiene alguna duda, no dude en contactarnos."></textarea>
+                                    <textarea id="settings-document-email-body" rows="6" placeholder="Buenos días,&#10;&#10;Le enviamos el {{tipo}} {{id}} en el archivo adjunto ({{nombre_archivo}}).&#10;&#10;Puede revisarlo y, si tiene alguna duda, no dude en contactarnos.&#10;&#10;Un cordial saludo."></textarea>
                                 </div>
 
                                 <hr style="border-color: var(--border); margin: 1.5rem 0;">
@@ -3204,7 +3243,7 @@
             </div>
         </div>
     </div>
-        <script src="app.js?v=19"></script>
+        <script src="app.js?v=24"></script>
 </body>
 
 </html>

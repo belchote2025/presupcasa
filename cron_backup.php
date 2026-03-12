@@ -3,8 +3,12 @@
  * Cron: copia de seguridad programada (email y/o webhook a Drive/nube).
  * Ejecutar solo por CLI. Programar cada hora para que compruebe si toca ejecutar:
  *   0 * * * * cd /ruta/a/presup && php cron_backup.php
- * (o cada día a una hora: 0 8 * * * ... si solo usas una hora fija)
+ * (o cada día a una hora: 0 8 * * * ... si solo usas una hora fijo)
  */
+declare(strict_types=1);
+
+require_once __DIR__ . '/config.php';
+
 if (php_sapi_name() !== 'cli') {
     http_response_code(403);
     exit('Solo permitida ejecución por línea de comandos (CLI).');
@@ -13,26 +17,12 @@ if (php_sapi_name() !== 'cli') {
 $baseDir = __DIR__;
 $isLocal = file_exists($baseDir . '/.cron_local') || getenv('PRESUP_CRON_LOCAL') === '1';
 
-if ($isLocal) {
-    $host = getenv('DB_HOST') ?: 'localhost';
-    $user = getenv('DB_USER') ?: 'root';
-    $pass = getenv('DB_PASS') ?: '';
-    $db   = getenv('DB_NAME') ?: 'presunavegatel';
-    $port = (int)(getenv('DB_PORT') ?: 3306);
-} else {
-    $host = getenv('DB_HOST') ?: 'localhost';
-    $user = getenv('DB_USER');
-    $pass = getenv('DB_PASS');
-    $db   = getenv('DB_NAME');
-    $port = (int)(getenv('DB_PORT') ?: 3306);
-    if (empty($db) || empty($user)) {
-        $code = @file_get_contents($baseDir . '/api.php');
-        if ($code && preg_match('/\$host\s*=\s*["\']([^"\']+)["\']/', $code, $m)) $host = $m[1];
-        if ($code && preg_match('/\$user\s*=\s*["\']([^"\']+)["\']/', $code, $m)) $user = $m[1];
-        if ($code && preg_match('/\$pass\s*=\s*["\']([^"\']*)["\']/', $code, $m)) $pass = $m[1];
-        if ($code && preg_match('/\$db\s*=\s*["\']([^"\']+)["\']/', $code, $m))   $db   = $m[1];
-    }
-}
+$dbConfig = getDatabaseConfig();
+$host = $dbConfig['host'];
+$user = $dbConfig['user'];
+$pass = $dbConfig['pass'];
+$db = $dbConfig['db'];
+$port = $dbConfig['port'];
 
 try {
     $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8";

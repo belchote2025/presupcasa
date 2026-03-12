@@ -1,10 +1,23 @@
 <?php
+declare(strict_types=1);
+
 // api.php - Versión de Máxima Estabilidad para Hostinger (Bypass 508 y Consolidación)
 // Prueba sugerida por Hostinger: renombrar a api.php.off para confirmar que el 508 viene de este script (la web cargará pero la API no).
-error_reporting(0); // Desactivar avisos para evitar romper el JSON
+
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/PERFORMANCE_OPTIMIZATION.php';
+require_once __DIR__ . '/MONITORING_SYSTEM.php';
+
+// Inicializar monitoreo
+MonitoringSystem::init();
+
+// Middleware de optimización
+performanceMiddleware();
+
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 $earlyAction = $_REQUEST['action'] ?? '';
 if (in_array($earlyAction, ['upload_email_attachment', 'send_email'], true)) {
-    @set_time_limit(120);
+    @set_time_limit(180);
     @ini_set('memory_limit', '256M');
 } else {
     @set_time_limit(45); // Evitar timeout en hosting compartido
@@ -17,6 +30,26 @@ if (php_sapi_name() !== 'cli') {
     @session_set_cookie_params(0, $basePath);
 }
 session_start();
+
+// Rate limiting simple
+if (!isset($_SESSION['requests'])) {
+    $_SESSION['requests'] = 0;
+    $_SESSION['requests_time'] = time();
+}
+
+if (time() - $_SESSION['requests_time'] > 60) {
+    $_SESSION['requests'] = 0;
+    $_SESSION['requests_time'] = time();
+}
+
+if ($_SESSION['requests'] > 100) {
+    http_response_code(429);
+    echo json_encode(['error' => 'Too Many Requests']);
+    exit;
+}
+
+$_SESSION['requests']++;
+
 $session_user_id = $_SESSION['user_id'] ?? null;
 $session_username = $_SESSION['username'] ?? null;
 $session_role = $_SESSION['role'] ?? null;
@@ -24,16 +57,18 @@ $session_role = $_SESSION['role'] ?? null;
 
 header("Content-Type: application/json; charset=utf-8");
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Referrer-Policy: strict-origin-when-cross-origin");
 
-if ($_SERVER['REMOTE_ADDR'] == '127.0.0.1' || $_SERVER['REMOTE_ADDR'] == '::1') {
-    $host = "localhost"; $user = "root"; $pass = ""; $db = "presunavegatel";
-    $port = 3306;
-    $socket = null;
-} else {
-    $host = "localhost"; $user = "u600265163_HAggBlS0j_presupadmin"; $pass = "Belchote1@"; $db = "u600265163_HAggBlS0j_presup";
-    $port = 3306;
-    $socket = null;
-}
+$dbConfig = getDatabaseConfig();
+$host = $dbConfig['host'];
+$user = $dbConfig['user'];
+$pass = $dbConfig['pass'];
+$db = $dbConfig['db'];
+$port = $dbConfig['port'];
+$socket = null;
 
 try {
     // Construir DSN con puerto explícito para evitar problemas con sockets Unix
@@ -118,7 +153,7 @@ try {
                 $lastError = "Puerto {$p}: no se pudo conectar.";
                 continue;
             }
-            stream_set_timeout($fp, 60);
+            stream_set_timeout($fp, 25);
             $read = function () use ($fp) {
                 $line = '';
                 while ($str = @fgets($fp, 8192)) {
@@ -163,13 +198,24 @@ try {
             $data = "To: <" . $to . ">\r\nSubject: " . $subject . "\r\n" . $rawMessage . "\r\n.\r\n";
             $data = preg_replace('/^\./m', '..', $data);
             @fwrite($fp, $data);
+            stream_set_timeout($fp, 45);
             $line = $read();
             $send("QUIT");
             fclose($fp);
             if ($code($line) === 250) {
                 return ['ok' => true];
             }
+            $rawLine = is_string($line) ? trim($line) : '';
+            if (function_exists('app_log')) {
+                app_log('SMTP DATA rechazado: ' . substr($rawLine, 0, 500), 'error');
+            }
             $lastError = 'Mensaje rechazado por el servidor.';
+            $serverMsg = preg_replace('/\s+/', ' ', $rawLine);
+            if ($serverMsg !== '') {
+                $lastError .= ' ' . $serverMsg;
+            } else {
+                $lastError .= ' (Gmail no devolvió texto. Prueba de nuevo o usa «Abrir mi correo».)';
+            }
         }
         return ['ok' => false, 'error' => $lastError ?: 'No se pudo enviar por SMTP.'];
     }
@@ -1778,7 +1824,7 @@ try {
                     $stmt = $pdo->prepare("REPLACE INTO quotes (id, date, client_name, client_id, client_address, client_email, client_phone, notes, status, user_id, subtotal, tax_amount, total_amount, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([$data['id'], $data['date'], $data['client']['name'], $data['client']['id'], $data['client']['address'], $data['client']['email'], $data['client']['phone'] ?? null, $data['notes'], $data['status'], $user_id, $data['totals']['subtotal'], $data['totals']['tax'], $data['totals']['total'], $project_id]);
                 } else {
-                    throw new Exception('no project_id column');
+                    throw new Exception('La columna project_id no existe en la tabla quotes. Ejecute la migración correspondiente.');
                 }
             } catch (Exception $e) {
                 $stmt = $pdo->prepare("REPLACE INTO quotes (id, date, client_name, client_id, client_address, client_email, client_phone, notes, status, user_id, subtotal, tax_amount, total_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -2599,6 +2645,16 @@ try {
 
             echo json_encode(['items' => $invoices, 'total' => $total_inv]);
             break;
+        case 'monitoring':
+            if ($session_role !== 'admin') {
+                echo json_encode(['status' => 'error', 'message' => 'Acceso denegado']);
+                break;
+            }
+            
+            $monitoringData = MonitoringSystem::getMonitoringEndpoint();
+            echo json_encode(['status' => 'success', 'data' => $monitoringData]);
+            MonitoringSystem::logPerformance('monitoring_access', ['user_id' => $session_user_id]);
+            break;
         case 'upgrade_database':
             // Actualizar toda la base de datos en local y producción (solo admin): ejecuta todos los esquemas en uno.
             // REGLA: Si creas un nuevo script .sql en scripts/, añade aquí la misma migración (ver scripts/REGLA_NUEVOS_SCRIPTS_BD.md).
@@ -2788,6 +2844,16 @@ try {
                         elseif ($col === 'smtp_user') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_user VARCHAR(255) NULL");
                         elseif ($col === 'smtp_pass') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_pass VARCHAR(255) NULL");
                         elseif ($col === 'smtp_secure') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_secure VARCHAR(10) DEFAULT 'tls'");
+                        $allChanges[] = "company_settings.$col";
+                    }
+                }
+                // 13b. Proveedores de email por API (Resend, SendGrid, Mailgun)
+                foreach (['email_provider', 'email_api_key', 'email_mailgun_domain'] as $col) {
+                    $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
+                    if ($chk->rowCount() === 0) {
+                        if ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                        elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                        elseif ($col === 'email_mailgun_domain') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_mailgun_domain VARCHAR(255) NULL");
                         $allChanges[] = "company_settings.$col";
                     }
                 }
@@ -4776,7 +4842,7 @@ try {
             }
             break;
         case 'send_email':
-            @set_time_limit(120);
+            @set_time_limit(180);
             if (!$session_user_id) {
                 echo json_encode(["status" => "error", "message" => "No autorizado. Inicia sesión."]);
                 break;
@@ -4819,30 +4885,32 @@ try {
                 $pdfFilename = trim($_POST['pdf_filename'] ?? 'documento.pdf');
                 $pdfB64 = $_POST['pdf_base64'] ?? '';
                 $pdfToken = preg_replace('/[^a-f0-9]/', '', (string)($_POST['pdf_token'] ?? ''));
+                $pdfPath = null;
                 if ($pdfToken !== '' && strlen($pdfToken) <= 32) {
                     $tmpPath = __DIR__ . '/tmp/email/' . $pdfToken . '.pdf';
                     if (is_file($tmpPath)) {
-                        $pdfB64 = base64_encode(file_get_contents($tmpPath));
-                        @unlink($tmpPath);
+                        $pdfPath = $tmpPath;
                     }
                 }
-                $boundary = md5(uniqid());
-                $subjectEnc = (preg_match('/[^\x20-\x7E]/', $subject)) ? '=?UTF-8?B?' . base64_encode($subject) . '?=' : $subject;
-                $headers = "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"{$boundary}\"\r\nFrom: {$fromHeader}\r\n";
-                $msg = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . base64_encode($body ?: 'Adjunto encontrará el documento.') . "\r\n";
-                if ($pdfB64 !== '') {
-                    $pdfB64Clean = preg_replace('/\s/', '', $pdfB64);
-                    $pdfB64Chunked = chunk_split($pdfB64Clean, 76, "\r\n");
-                    $msg .= "--{$boundary}\r\nContent-Type: application/pdf; name=\"" . basename($pdfFilename) . "\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"" . basename($pdfFilename) . "\"\r\n\r\n" . $pdfB64Chunked . "\r\n";
+                if ($pdfPath === null && $pdfB64 !== '') {
+                    $raw = base64_decode(preg_replace('/\s/', '', $pdfB64), true);
+                    if ($raw !== false) {
+                        $tmpDir = __DIR__ . '/tmp/email';
+                        if (!is_dir($tmpDir)) @mkdir($tmpDir, 0755, true);
+                        $pdfPath = $tmpDir . '/send_' . bin2hex(random_bytes(8)) . '.pdf';
+                        if (file_put_contents($pdfPath, $raw) !== false) {
+                            register_shutdown_function(function () use ($pdfPath) { if (is_file($pdfPath)) @unlink($pdfPath); });
+                        } else {
+                            $pdfPath = null;
+                        }
+                    }
                 }
-                $msg .= "--{$boundary}--";
-                $fullMessage = $headers . "\r\n" . $msg;
 
                 $ok = false;
                 $errorMessage = '';
                 $row = null;
                 try {
-                    foreach (['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure'] as $col) {
+                    foreach (['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_provider', 'email_api_key', 'email_mailgun_domain'] as $col) {
                         $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
                         if ($chk->rowCount() === 0) {
                             if ($col === 'smtp_enabled') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_enabled TINYINT(1) DEFAULT 0");
@@ -4851,33 +4919,73 @@ try {
                             elseif ($col === 'smtp_user') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_user VARCHAR(255) NULL");
                             elseif ($col === 'smtp_pass') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_pass VARCHAR(255) NULL");
                             elseif ($col === 'smtp_secure') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_secure VARCHAR(10) DEFAULT 'tls'");
+                            elseif ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                            elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                            elseif ($col === 'email_mailgun_domain') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_mailgun_domain VARCHAR(255) NULL");
                         }
                     }
-                    $row = $pdo->query("SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
-                    $smtpOn = $row && (isset($row['smtp_enabled']) && ($row['smtp_enabled'] === 1 || $row['smtp_enabled'] === '1' || (string)$row['smtp_enabled'] === '1'));
-                    $hostOk = !empty(trim((string)($row['smtp_host'] ?? '')));
-                    $userOk = !empty(trim((string)($row['smtp_user'] ?? '')));
-                    if ($row && $smtpOn && $hostOk && $userOk) {
-                        $smtp = [
-                            'host' => trim($row['smtp_host']),
-                            'port' => (int)($row['smtp_port'] ?? 587),
-                            'user' => trim($row['smtp_user']),
-                            'pass' => $row['smtp_pass'] ?? '',
-                            'secure' => strtolower(trim($row['smtp_secure'] ?? 'tls')),
-                            'from_email' => $fromEmail
+                    $row = $pdo->query("SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, email_provider, email_api_key, email_mailgun_domain FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+                    if (!$row) {
+                        @$pdo->exec("INSERT IGNORE INTO company_settings (id, name, cif, email, address, default_tax) VALUES (1, '', '', '', '', 21)");
+                        $row = $pdo->query("SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, email_provider, email_api_key, email_mailgun_domain FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC) ?: [];
+                    }
+                    $provider = strtolower(trim((string)($row['email_provider'] ?? 'smtp')));
+                    $apiKey = trim((string)($row['email_api_key'] ?? ''));
+                    $useApi = in_array($provider, ['resend', 'sendgrid', 'mailgun'], true) && $apiKey !== '';
+                    if ($useApi) {
+                        require_once __DIR__ . '/lib/TransmissionMailer.php';
+                        $apiFromEmail = $fromEmail;
+                        $apiFromName = $fromName ?: '';
+                        if ($provider === 'resend') {
+                            $apiFromEmail = trim($apiFromEmail);
+                            if ($apiFromEmail === '' || stripos($apiFromEmail, '@resend.dev') === false) {
+                                $apiFromEmail = 'onboarding@resend.dev';
+                                $apiFromName = $apiFromName ?: 'Presup';
+                            }
+                        }
+                        $config = [
+                            'api_key' => $apiKey,
+                            'from_email' => $apiFromEmail,
+                            'from_name' => $apiFromName,
                         ];
-                        $result = send_email_via_smtp($to, $subjectEnc, $fullMessage, $smtp);
+                        if ($provider === 'mailgun') {
+                            $config['domain'] = trim((string)($row['email_mailgun_domain'] ?? ''));
+                        }
+                        $result = TransmissionMailer::send($provider, $config, $to, $subject, $body ?: 'Adjunto encontrará el documento.', $pdfPath, $pdfFilename);
+                        if ($pdfPath && is_file($pdfPath)) {
+                            @unlink($pdfPath);
+                        }
                         $ok = !empty($result['ok']);
                         if (!$ok && !empty($result['error'])) $errorMessage = $result['error'];
+                    } else {
+                        $smtpOn = $row && (isset($row['smtp_enabled']) && ($row['smtp_enabled'] === 1 || $row['smtp_enabled'] === '1' || (string)$row['smtp_enabled'] === '1'));
+                        $hostOk = !empty(trim((string)($row['smtp_host'] ?? '')));
+                        $userOk = !empty(trim((string)($row['smtp_user'] ?? '')));
+                        if ($row && $smtpOn && $hostOk && $userOk) {
+                            require_once __DIR__ . '/lib/PresupMailer.php';
+                            $smtpUser = trim($row['smtp_user']);
+                            $mailer = new PresupMailer([
+                                'host' => trim($row['smtp_host']),
+                                'port' => (int)($row['smtp_port'] ?? 587),
+                                'user' => $smtpUser,
+                                'pass' => $row['smtp_pass'] ?? '',
+                                'secure' => strtolower(trim($row['smtp_secure'] ?? 'tls')),
+                                'from_email' => strtolower($smtpUser),
+                                'reply_to' => $fromEmail
+                            ]);
+                            $result = $mailer->send($to, $subject, $body ?: 'Adjunto encontrará el documento.', $pdfPath, $pdfFilename);
+                            if ($pdfPath && is_file($pdfPath)) {
+                                @unlink($pdfPath);
+                            }
+                            $ok = !empty($result['ok']);
+                            if (!$ok && !empty($result['error'])) $errorMessage = $result['error'];
+                        }
                     }
                 } catch (Exception $e) {
                     $errorMessage = $e->getMessage();
                 }
                 if (!$ok && $errorMessage === '') {
-                    $ok = @mail($to, $subjectEnc, $msg, $headers);
-                    if (!$ok) {
-                        $errorMessage = 'No se pudo enviar el correo. Ve a Configuración → Empresa, activa «Usar SMTP para enviar correos», elige Gmail (o escribe smtp.gmail.com, puerto 587), rellena Usuario (ej. belchote2025@gmail.com) y Contraseña de aplicación, pulsa Guardar configuración y prueba de nuevo.';
-                    }
+                    $errorMessage = 'Configura el envío en Configuración → Empresa: SMTP (servidor, usuario, contraseña) o un proveedor por API (Resend, SendGrid, Mailgun) con su API key.';
                 }
                 $resp = $ok ? ["status" => "success"] : ["status" => "error", "message" => $errorMessage ?: "No se pudo enviar el correo. Configura SMTP en Configuración."];
                 if (!$ok && isset($row)) {
@@ -4894,13 +5002,40 @@ try {
                 echo json_encode(["status" => "error", "message" => "Error al enviar: " . $e->getMessage()]);
             }
             break;
+        case 'setup_resend':
+            if (!$session_user_id) {
+                echo json_encode(["status" => "error", "message" => "Inicia sesión en la app y vuelve a abrir esta página."]);
+                break;
+            }
+            $key = trim((string)($_POST['api_key'] ?? $_GET['api_key'] ?? ''));
+            if ($key === '' || stripos($key, 're_') !== 0) {
+                echo json_encode(["status" => "error", "message" => "Pega una API key de Resend (empieza por re_)."]);
+                break;
+            }
+            try {
+                foreach (['email_provider', 'email_api_key'] as $col) {
+                    $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
+                    if ($chk->rowCount() === 0) {
+                        if ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                        elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                    }
+                }
+                if ($pdo->query("SELECT 1 FROM company_settings WHERE id = 1")->fetch() === false) {
+                    $pdo->prepare("INSERT INTO company_settings (id, name, cif, email, address, default_tax) VALUES (1, '', '', '', '', 21)")->execute();
+                }
+                $pdo->prepare("UPDATE company_settings SET email_provider = ?, email_api_key = ? WHERE id = 1")->execute(['resend', $key]);
+                echo json_encode(["status" => "success", "message" => "Resend configurado. Ya puedes enviar correos."]);
+            } catch (Exception $e) {
+                echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+            }
+            break;
         case 'save_smtp_only':
             if (!$session_user_id) {
                 echo json_encode(["status" => "error", "message" => "No autorizado"]);
                 break;
             }
             try {
-                foreach (['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure'] as $col) {
+                foreach (['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure', 'email_provider', 'email_api_key', 'email_mailgun_domain'] as $col) {
                     $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
                     if ($chk->rowCount() === 0) {
                         if ($col === 'smtp_enabled') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_enabled TINYINT(1) DEFAULT 0");
@@ -4909,6 +5044,9 @@ try {
                         elseif ($col === 'smtp_user') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_user VARCHAR(255) NULL");
                         elseif ($col === 'smtp_pass') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_pass VARCHAR(255) NULL");
                         elseif ($col === 'smtp_secure') $pdo->exec("ALTER TABLE company_settings ADD COLUMN smtp_secure VARCHAR(10) DEFAULT 'tls'");
+                        elseif ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                        elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                        elseif ($col === 'email_mailgun_domain') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_mailgun_domain VARCHAR(255) NULL");
                     }
                 }
                 $hasRow = $pdo->query("SELECT 1 FROM company_settings WHERE id = 1")->fetch();
@@ -4926,10 +5064,99 @@ try {
                 } else {
                     $pdo->prepare("UPDATE company_settings SET smtp_enabled=?, smtp_host=?, smtp_port=?, smtp_user=?, smtp_secure=? WHERE id=1")->execute([$smtpEnabled, $smtpHost ?: null, $smtpPort, $smtpUser ?: null, $smtpSecure]);
                 }
-                echo json_encode(["status" => "success", "message" => "SMTP guardado correctamente."]);
+                $emailProvider = in_array(strtolower(trim($_POST['email_provider'] ?? 'smtp')), ['smtp', 'resend', 'sendgrid', 'mailgun'], true) ? strtolower(trim($_POST['email_provider'] ?? 'smtp')) : 'smtp';
+                $emailApiKey = trim((string)($_POST['email_api_key'] ?? ''));
+                $emailMailgunDomain = trim((string)($_POST['email_mailgun_domain'] ?? ''));
+                $pdo->prepare("UPDATE company_settings SET email_provider=?, email_api_key=?, email_mailgun_domain=? WHERE id=1")->execute([$emailProvider, $emailApiKey ?: null, $emailMailgunDomain ?: null]);
+                echo json_encode(["status" => "success", "message" => "Envío de correo guardado correctamente."]);
             } catch (Exception $e) {
                 app_log("save_smtp_only: " . $e->getMessage(), 'error');
                 echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+            }
+            break;
+        case 'test_smtp':
+            if (!$session_user_id) {
+                echo json_encode(["status" => "error", "message" => "No autorizado. Inicia sesión."]);
+                break;
+            }
+            $to = trim($_POST['to'] ?? $_GET['to'] ?? '');
+            if (!$to || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                $row = $pdo->query("SELECT smtp_user FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+                $to = $row ? trim($row['smtp_user'] ?? '') : '';
+            }
+            if (!$to || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                echo json_encode(["status" => "error", "message" => "Indica un email de destino válido (parámetro to=)."]);
+                break;
+            }
+            try {
+                $row = $pdo->query("SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, email_provider, email_api_key, email_mailgun_domain FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+                if (!$row) {
+                    echo json_encode(["status" => "error", "message" => "No hay configuración de correo. Ve a Configuración → Empresa."]);
+                    break;
+                }
+                $provider = strtolower(trim((string)($row['email_provider'] ?? 'smtp')));
+                $apiKey = trim((string)($row['email_api_key'] ?? ''));
+                $useApi = in_array($provider, ['resend', 'sendgrid', 'mailgun'], true) && $apiKey !== '';
+                if ($useApi) {
+                    $fromEmail = null;
+                    $fromName = null;
+                    try {
+                        $chk = $pdo->query("SHOW TABLES LIKE 'companies'");
+                        if ($chk->rowCount() > 0) {
+                            $stmt = $pdo->prepare("SELECT email, sender_name FROM companies WHERE id = ?");
+                            $stmt->execute([$current_company_id]);
+                            $cfg = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if ($cfg) { $fromEmail = $cfg['email'] ?? null; $fromName = $cfg['sender_name'] ?? null; }
+                        }
+                        if ($fromEmail === null || $fromEmail === '') {
+                            $stmt = $pdo->query("SELECT email, sender_name FROM company_settings WHERE id = 1");
+                            $cfg = $stmt->fetch(PDO::FETCH_ASSOC);
+                            $fromEmail = $cfg['email'] ?? null;
+                            $fromName = $cfg['sender_name'] ?? null;
+                        }
+                    } catch (Exception $e) {}
+                    if (!$fromEmail) $fromEmail = 'noreply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+                    if ($provider === 'resend' && (trim($fromEmail) === '' || stripos($fromEmail, '@resend.dev') === false)) {
+                        $fromEmail = 'onboarding@resend.dev';
+                        $fromName = trim($fromName ?: '') ?: 'Presup';
+                    }
+                    require_once __DIR__ . '/lib/TransmissionMailer.php';
+                    $config = ['api_key' => $apiKey, 'from_email' => $fromEmail, 'from_name' => $fromName ?: ''];
+                    if ($provider === 'mailgun') $config['domain'] = trim((string)($row['email_mailgun_domain'] ?? ''));
+                    $result = TransmissionMailer::send($provider, $config, $to, 'PRESUP – Prueba de correo', 'Este es un correo de prueba. Si lo recibes, la configuración es correcta.', null, '');
+                    if (!empty($result['ok'])) {
+                        echo json_encode(["status" => "success", "message" => "Correo de prueba enviado correctamente a " . $to . ". Revisa la bandeja (y spam)."]);
+                    } else {
+                        echo json_encode(["status" => "error", "message" => $result['error'] ?? 'No se pudo enviar.']);
+                    }
+                    break;
+                }
+                $smtpOn = $row && (isset($row['smtp_enabled']) && ($row['smtp_enabled'] == 1 || (string)$row['smtp_enabled'] === '1'));
+                $hostOk = !empty(trim((string)($row['smtp_host'] ?? '')));
+                $userOk = !empty(trim((string)($row['smtp_user'] ?? '')));
+                if (!$smtpOn || !$hostOk || !$userOk) {
+                    echo json_encode(["status" => "error", "message" => "SMTP no configurado. Ve a Configuración → Empresa, activa SMTP y rellena servidor y usuario, o elige Resend/SendGrid/Mailgun con API key."]);
+                    break;
+                }
+                require_once __DIR__ . '/lib/PresupMailer.php';
+                $smtpUser = trim($row['smtp_user']);
+                $mailer = new PresupMailer([
+                    'host' => trim($row['smtp_host']),
+                    'port' => (int)($row['smtp_port'] ?? 587),
+                    'user' => $smtpUser,
+                    'pass' => $row['smtp_pass'] ?? '',
+                    'secure' => strtolower(trim($row['smtp_secure'] ?? 'tls')),
+                    'from_email' => strtolower($smtpUser),
+                    'reply_to' => $smtpUser
+                ]);
+                $result = $mailer->send($to, 'PRESUP – Prueba de correo', 'Este es un correo de prueba. Si lo recibes, la configuración SMTP es correcta.', null, '');
+                if (!empty($result['ok'])) {
+                    echo json_encode(["status" => "success", "message" => "Correo de prueba enviado correctamente a " . $to . ". Revisa la bandeja de entrada (y spam)."]);
+                } else {
+                    echo json_encode(["status" => "error", "message" => $result['error'] ?? 'No se pudo enviar.']);
+                }
+            } catch (Throwable $e) {
+                echo json_encode(["status" => "error", "message" => "Error: " . $e->getMessage()]);
             }
             break;
         case 'send_backup_email':
@@ -5094,6 +5321,18 @@ try {
                     $row = $pdo->query("SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_secure FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
                     if ($row !== false) {
                         foreach (['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_secure'] as $k) { if (array_key_exists($k, $row)) $settings[$k] = $row[$k]; }
+                    }
+                    foreach (['email_provider', 'email_api_key', 'email_mailgun_domain'] as $col) {
+                        $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
+                        if ($chk->rowCount() === 0) {
+                            if ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                            elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                            elseif ($col === 'email_mailgun_domain') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_mailgun_domain VARCHAR(255) NULL");
+                        }
+                    }
+                    $row = $pdo->query("SELECT email_provider, email_api_key, email_mailgun_domain FROM company_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+                    if ($row !== false) {
+                        foreach (['email_provider', 'email_api_key', 'email_mailgun_domain'] as $k) { if (array_key_exists($k, $row)) $settings[$k] = $row[$k]; }
                     }
                     $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE 'pwa_install_enabled'");
                     if ($chk->rowCount() > 0) {
@@ -5266,6 +5505,18 @@ try {
                     } else {
                         $pdo->prepare("UPDATE company_settings SET smtp_enabled=?, smtp_host=?, smtp_port=?, smtp_user=?, smtp_secure=? WHERE id=1")->execute([$smtpEnabled, $smtpHost ?: null, $smtpPort, $smtpUser ?: null, $smtpSecure]);
                     }
+                    foreach (['email_provider', 'email_api_key', 'email_mailgun_domain'] as $col) {
+                        $chk = $pdo->query("SHOW COLUMNS FROM company_settings LIKE '$col'");
+                        if ($chk->rowCount() === 0) {
+                            if ($col === 'email_provider') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_provider VARCHAR(20) DEFAULT 'smtp'");
+                            elseif ($col === 'email_api_key') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_api_key VARCHAR(255) NULL");
+                            elseif ($col === 'email_mailgun_domain') $pdo->exec("ALTER TABLE company_settings ADD COLUMN email_mailgun_domain VARCHAR(255) NULL");
+                        }
+                    }
+                    $emailProvider = in_array(strtolower(trim($_POST['email_provider'] ?? 'smtp')), ['smtp', 'resend', 'sendgrid', 'mailgun'], true) ? strtolower(trim($_POST['email_provider'] ?? 'smtp')) : 'smtp';
+                    $emailApiKey = trim((string)($_POST['email_api_key'] ?? ''));
+                    $emailMailgunDomain = trim((string)($_POST['email_mailgun_domain'] ?? ''));
+                    $pdo->prepare("UPDATE company_settings SET email_provider=?, email_api_key=?, email_mailgun_domain=? WHERE id=1")->execute([$emailProvider, $emailApiKey ?: null, $emailMailgunDomain ?: null]);
                 } catch (Exception $e) {
                     if (strpos($e->getMessage(), 'Unknown column') === false) app_log("save_settings smtp: " . $e->getMessage(), 'error');
                 }

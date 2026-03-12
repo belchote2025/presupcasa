@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurar Resend – Presup</title>
+    <link rel="stylesheet" href="style.css?v=6">
+    <style>
+        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+        .setup-card { max-width: 420px; width: 100%; }
+        .setup-card h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        .setup-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+        .setup-card input { width: 100%; padding: 0.6rem; margin-bottom: 1rem; }
+        .setup-card .msg { margin-top: 1rem; padding: 0.6rem; border-radius: 8px; display: none; }
+        .setup-card .msg.success { background: rgba(16,185,129,0.15); color: var(--success, #10b981); }
+        .setup-card .msg.error { background: rgba(239,68,68,0.15); color: var(--error, #ef4444); }
+    </style>
+</head>
+<body>
+    <div class="card setup-card">
+        <h1>Configurar correo con Resend</h1>
+        <p>Pega tu API key de Resend (la que empieza por <code>re_</code>). Los correos se enviarán solos desde la app.</p>
+        <form id="form-resend">
+            <label for="api_key">API Key de Resend</label>
+            <input type="password" id="api_key" name="api_key" placeholder="re_..." autocomplete="off" required>
+            <button type="submit" class="btn btn-primary" id="btn-save">Guardar</button>
+        </form>
+        <div id="msg" class="msg" role="alert"></div>
+        <p style="margin-top: 1.25rem; font-size: 0.85rem;"><a href="index.html" class="link">← Volver a la app</a></p>
+    </div>
+    <script>
+        (function() {
+            var form = document.getElementById('form-resend');
+            var msg = document.getElementById('msg');
+            var btn = document.getElementById('btn-save');
+            function showMsg(text, isError) {
+                msg.textContent = text;
+                msg.className = 'msg ' + (isError ? 'error' : 'success');
+                msg.style.display = 'block';
+            }
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                var key = (document.getElementById('api_key').value || '').trim();
+                if (!key) { showMsg('Escribe la API key.', true); return; }
+                btn.disabled = true;
+                msg.style.display = 'none';
+                try {
+                    var fd = new FormData();
+                    fd.append('action', 'setup_resend');
+                    fd.append('api_key', key);
+                    var base = window.location.pathname.replace(/\/[^/]*$/, '') || '';
+                    var url = (base ? base + '/' : '') + 'api.php';
+                    var r = await fetch(url, { method: 'POST', body: fd });
+                    var j = await r.json();
+                    if (j && j.status === 'success') {
+                        showMsg(j.message || 'Listo. Ya puedes enviar correos.');
+                    } else {
+                        showMsg(j && j.message ? j.message : 'Error al guardar.', true);
+                    }
+                } catch (err) {
+                    showMsg('Error de conexión. ¿Has iniciado sesión en la app?', true);
+                }
+                btn.disabled = false;
+            });
+        })();
+    </script>
+</body>
+</html>
